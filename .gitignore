@@ -1,0 +1,13 @@
+**/data
+*.txt
+!requirements.txt
+*.csv
+*.ods
+*.m
+*.info
+notebooks/.ipynb_checkpoints
+*.ods#
+**/.idea
+**/__pycache__
+**/old
+*.pyc
