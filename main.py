@@ -18,7 +18,7 @@ def main(args, train_csv, test_csv, embedding, cache):
     train_iter, val_iter, test_iter = iterate(train, val, test, args.batch_size)
 
     eval_every = len(list(iter(train_iter)))/args.n_eval
-    model = BiLSTM(text.vocab.vectors, lstm_layer=2, padding_idx=text.vocab.stoi[text.pad_token], hidden_dim=200).cuda()
+    model = BiLSTM(text.vocab.vectors, lstm_layer=2, padding_idx=text.vocab.stoi[text.pad_token], hidden_dim=128).cuda()
     # loss_function = nn.BCEWithLogitsLoss(pos_weight=torch.Tensor([pos_w]).cuda())
     loss_function = nn.BCEWithLogitsLoss()
     optimizer = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=args.lr)
