@@ -8,7 +8,7 @@ from models import BiLSTM
 from preprocess import preprocess, iterate
 from learner import Learner
 from utils import submit
-from test.create_test_datasets import reduce_embedding, reduce_datasets
+from create_test_datasets import reduce_embedding, reduce_datasets
 
 
 def main(args, train_csv, test_csv, embedding, cache):
@@ -24,12 +24,13 @@ def main(args, train_csv, test_csv, embedding, cache):
     loss_function = nn.BCEWithLogitsLoss()
     optimizer = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=args.lr)
     dataloaders = train_iter, val_iter, test_iter
-    learn = Learner(model, dataloaders, loss_function, optimizer)
+    learn = Learner(model, dataloaders, loss_function, optimizer, args)
     learn.fit(args.epoch, eval_every, args.f1_tresh, args.early_stop, args.warmup_epoch)
 
     # predict test labels
     learn.load()
     test_label, _, test_ids = learn.predict_labels(is_test=True, tresh=[0.01, 0.5, 0.01])
+    learn.record()
     test_ids = [qid.vocab.itos[i] for i in test_ids]
     submit(test_ids, test_label)
 
