@@ -51,8 +51,7 @@ if __name__ == '__main__':
     arg('--embedding', '-em', default='glove', choices=['glove', 'google_news','paragram', 'wiki_news'])
     arg('--f1_tresh', '-ft', default=0.33, type=float)
 
-    args = parser.parse_args(args=[])
-
+    args = parser.parse_args()
 
     if args.embedding == 'glove':
         emb_path = 'embeddings/glove.840B.300d/glove.840B.300d.txt'
