@@ -3,13 +3,17 @@ import torch
 import os
 from sklearn.metrics import f1_score
 import warnings
-import time
-import csv
 import pandas as pd
 import shutil
+import subprocess
+import time
 
 from utils import f1_metric, print_duration
 
+def get_hash():
+    hash = subprocess.check_output(['git', 'describe', '--always'])
+    hash = hash.decode("utf-8")[1:-1]
+    return hash
 
 def str_date_time():
     struct_time = time.localtime()
@@ -208,7 +212,8 @@ class Learner:
         for arg in vars(self.args):
             param_dict[arg] = getattr(self.args, arg)
         info = torch.load(self.best_info_path)
-        param_dict = {'subdir':subdir, **param_dict, **info}
+        hash = get_hash()
+        param_dict = {'hash':hash, 'subdir':subdir, **param_dict, **info}
         dict_to_csv(param_dict, csvlog, 'w', 'index', reverse=False)
         dict_to_csv(param_dict, self.record_path, 'a', 'columns', reverse=True)
         shutil.copy(self.best_model_path, subdir)
@@ -219,8 +224,3 @@ class Learner:
         info = torch.load(self.best_info_path)
         return info
 
-
-if __name__ == '__main__':
-    struct_time = time.localtime()
-    str_time = time.strftime('%b_%d_%Y__%H:%M:%S', struct_time)
-    print(str_time)
