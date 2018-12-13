@@ -58,8 +58,7 @@ if __name__ == '__main__':
     arg('--hidden_dim', '-hd', default=100)
     arg('--dropout', '-d', default=0.2)
 
-    args = parser.parse_args(args=[])
-    print(args)
+    args = parser.parse_args()
 
     if args.embedding == 'glove':
         emb_path = 'embeddings/glove.840B.300d/glove.840B.300d.txt'
