@@ -60,7 +60,6 @@ if __name__ == '__main__':
 
     args = parser.parse_args(args=[])
     print(args)
-    print(type(args))
 
     if args.embedding == 'glove':
         emb_path = 'embeddings/glove.840B.300d/glove.840B.300d.txt'
@@ -81,6 +80,7 @@ if __name__ == '__main__':
         n_cut = 1000
         n_cut_emb = 10000
         args.batch_size = n_cut/5
+        args.n_eval = 1
 
         if args.machine == 'kaggle':
             data_dir = '.'

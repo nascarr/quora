@@ -142,6 +142,7 @@ class Learner:
 
     def save(self, info):
         os.makedirs('./models', exist_ok=True)
+        #os.makedir('./models/')
         torch.save(info, './models/best_model.info')
         torch.save(self.model, './models/best_model.m')
 
