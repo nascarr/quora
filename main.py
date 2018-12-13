@@ -18,7 +18,8 @@ def main(args, train_csv, test_csv, embedding, cache):
     train_iter, val_iter, test_iter = iterate(train, val, test, args.batch_size)
 
     eval_every = len(list(iter(train_iter)))/args.n_eval
-    model = BiLSTM(text.vocab.vectors, lstm_layer=2, padding_idx=text.vocab.stoi[text.pad_token], hidden_dim=128).cuda()
+    if args.model == 'BiLSTM':
+        model = BiLSTM(text.vocab.vectors, lstm_layer=args.n_layers, padding_idx=text.vocab.stoi[text.pad_token], hidden_dim=args.hidden_dim, dropout=args.dropout).cuda()
     # loss_function = nn.BCEWithLogitsLoss(pos_weight=torch.Tensor([pos_w]).cuda())
     loss_function = nn.BCEWithLogitsLoss()
     optimizer = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=args.lr)
@@ -40,7 +41,7 @@ if __name__ == '__main__':
     arg('--machine', default='dt', choices=['dt', 'kaggle'])
     arg('--mode', default='run', choices=['test', 'run'])
     arg('--epoch', '-e', default=7, type=int)
-    arg('--lr', '-l', default=1e-3, type=float)
+    arg('--lr','-lr', default=1e-3, type=float)
     arg('--batch_size', '-bs', default=512, type=int)
     arg('--n_eval', '-ne', default=1, type=int, help='Number of validation set evaluations during 1 epoch')
     arg('--warmup_epoch', '-we', default=2, type=int, help='Number of epochs without fine tuning')
@@ -51,8 +52,15 @@ if __name__ == '__main__':
     arg('--embedding', '-em', default='glove', choices=['glove', 'google_news','paragram', 'wiki_news'])
     arg('--f1_tresh', '-ft', default=0.33, type=float)
 
-    args = parser.parse_args(args=[])
+    #model params
+    arg('--model', '-m', default = 'BiLSTM', choices=['BiLSTM'])
+    arg('--n_layers', '-l', default=2, help='Number of layers in model')
+    arg('--hidden_dim', '-hd', default=100)
+    arg('--dropout', '-d', default=0.2)
 
+    args = parser.parse_args(args=[])
+    print(args)
+    print(type(args))
 
     if args.embedding == 'glove':
         emb_path = 'embeddings/glove.840B.300d/glove.840B.300d.txt'
