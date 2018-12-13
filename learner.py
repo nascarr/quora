@@ -3,11 +3,44 @@ import torch
 import os
 from sklearn.metrics import f1_score
 import warnings
+import pandas as pd
+import shutil
+import subprocess
 import time
+
 from utils import f1_metric, print_duration
 
+def get_hash():
+    hash = subprocess.check_output(['git', 'describe', '--always'])
+    hash = hash.decode("utf-8")[1:-1]
+    return hash
+
+def str_date_time():
+    struct_time = time.localtime()
+    date_time = time.strftime('%b_%d_%Y__%H:%M:%S', struct_time)
+    return date_time
+
+
+def dict_to_csv(dict, csvname, mode, orient, reverse):
+    if orient == 'index':
+        df = pd.DataFrame.from_dict(dict, orient='index')
+        df.to_csv(csvname, header=False, mode=mode)
+    if orient == 'columns':
+        df = pd.DataFrame(dict, index=[0])
+        if reverse: #reverse dataframe columnes
+            df = df.iloc[:, ::-1]
+        df.to_csv(csvname, index=False, mode=mode)
+    # TODO: append rows considering columns names
+
+
 class Learner:
-    def __init__(self, model, dataloaders, loss_func, optimizer):
+
+    models_dir = './models'
+    best_model_path = './models/best_model.m'
+    best_info_path = './models/best_model.info'
+    record_dir = './notes'
+
+    def __init__(self, model, dataloaders, loss_func, optimizer, args):
         self.model = model
         self.loss_func = loss_func
         self.optimizer = optimizer
@@ -18,6 +51,11 @@ class Learner:
         elif len(dataloaders) == 1:
             self.train_dl = dataloaders
             self.val_dl = None
+        self.args = args
+        if self.args.mode == 'test':
+            self.record_path = './notes/test_records.csv'
+        elif self.args.mode == 'run':
+            self.record_path = './notes/records.csv'
 
     def fit(self, epoch, eval_every, tresh, early_stop=1, warmup_epoch=2):
         print('Start training!')
@@ -76,20 +114,23 @@ class Learner:
                         n_targs += sum(val_y)
                         n_preds += sum(val_label)
                     f1 = f1_metric(tp, n_targs, n_preds)
-
                     val_record.append({'step': step, 'loss': np.mean(val_loss), 'f1_score': f1})
+
+                    train_loss = np.mean(losses)
+                    val_loss = np.mean(val_loss)
+                    info = {'best_ep': e, 'step': step, 'train_loss': train_loss,
+                            'val_loss': val_loss, 'f1_score': f1}
+                    info = self.format_info(info)
                     print('epoch {:02} - step {:06} - train_loss {:.4f} - val_loss {:.4f} - f1 {:.4f}'.format(
-                        e, step, np.mean(losses), val_record[-1]['loss'], f1))
+                        *list(info.values())))
+
                     if val_record[-1]['f1_score'] >= max_f1:
-                        self.save(info={'step': step, 'epoch': e, 'train_loss': np.mean(losses),
-                                        'val_loss': val_record[-1]['loss'], 'f1_score': val_record[-1]['f1_score']})
+                        self.save(info)
                         max_f1 = val_record[-1]['f1_score']
                         no_improve_in_previous_epoch = False
-
+        print_duration(time_start, 'Training time: ')
         m_info = self.load()
         print(f'Best model: {m_info}')
-        print_duration(time_start, 'Training time: ')
-
 
     def predict_probs(self, is_test=False):
         if is_test:
@@ -127,25 +168,59 @@ class Learner:
                 if tmp[1] > tmp[2]:
                     tr = tmp[0]
                     tmp[2] = tmp[1]
-            print('best threshold is {:.4f} with F1 score: {:.4f}'.format(tr, tmp[2]))
-            return tr
+            print('Best threshold is {:.4f} with F1 score: {:.4f}'.format(tr, tmp[2]))
+            return tr, tmp[2]
 
         y_pred, y_true, ids = self.predict_probs(is_test=is_test)
 
         if type(tresh) == list:
-            tresh = _choose_tr(self, *tresh)
+            tresh, max_f1 = _choose_tr(self, *tresh)
+            self.append_info({'best_tr': tresh, 'best_f1': max_f1})
 
         y_label = (np.array(y_pred) >= tresh).astype(int)
         return y_label, y_true, ids
 
-
-
     def save(self, info):
-        os.makedirs('./models', exist_ok=True)
-        torch.save(info, './models/best_model.info')
-        torch.save(self.model, './models/best_model.m')
+        os.makedirs(self.models_dir, exist_ok=True)
+        torch.save(self.model, self.best_model_path)
+        torch.save(info, self.best_info_path)
+
+    @staticmethod
+    def format_info(info):
+        keys = list(info.keys())
+        values = list(info.values())
+        for k, v in zip(keys, values):
+            info[k] = round(v, 4)
+        return info
+
+    @classmethod
+    def append_info(cls, dict):
+        dict = cls.format_info(dict)
+        info = torch.load(cls.best_info_path)
+        info.update(dict)
+        torch.save(info, cls.best_info_path)
+
+    def record(self):
+        os.makedirs(self.record_dir, exist_ok=True)
+        subdir = os.path.join(self.models_dir, str_date_time())
+        if self.args.mode == 'test':
+            subdir +=  '_test'
+        os.mkdir(subdir)
+
+        csvlog = os.path.join(subdir, 'info.csv')
+        param_dict = {}
+        for arg in vars(self.args):
+            param_dict[arg] = getattr(self.args, arg)
+        info = torch.load(self.best_info_path)
+        hash = get_hash()
+        param_dict = {'hash':hash, 'subdir':subdir, **param_dict, **info}
+        dict_to_csv(param_dict, csvlog, 'w', 'index', reverse=False)
+        dict_to_csv(param_dict, self.record_path, 'a', 'columns', reverse=True)
+        shutil.copy(self.best_model_path, subdir)
+
 
     def load(self):
-        self.model = torch.load('./models/best_model.m')
-        info = torch.load('./models/best_model.info')
+        self.model = torch.load(self.best_model_path)
+        info = torch.load(self.best_info_path)
         return info
+
