@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 import os
 import random
 import torch.nn as nn
@@ -55,9 +56,9 @@ if __name__ == '__main__':
 
     #model params
     arg('--model', '-m', default = 'BiLSTM', choices=['BiLSTM'])
-    arg('--n_layers', '-l', default=2, help='Number of layers in model')
-    arg('--hidden_dim', '-hd', default=100)
-    arg('--dropout', '-d', default=0.2)
+    arg('--n_layers', '-n', default=2, type=int, help='Number of layers in model')
+    arg('--hidden_dim', '-hd', type=int, default=100)
+    arg('--dropout', '-d', type=float, default=0.2)
 
     args = parser.parse_args()
 
