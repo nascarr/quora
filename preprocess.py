@@ -1,20 +1,14 @@
 import torchtext.data as data
 import torchtext.vocab as vocab
-import timefrom joblib import Memory
+import time
 
 from utils import print_duration
-
-class DataProcessor():
-    def __init__(self):
-        pass
-
-    def read_data(train_csv, test_csv):
+from dataloader import MyTabularDataset
 
 
-    def preprocess(train_csv, test_csv, tokenizer, embeddings, cache):
+def preprocess(train_csv, test_csv, tokenizer, embeddings, cache):
         # types of csv columns
         location = './cachedir'
-        memory = Memory(location, verbose=0)
         time_start = time.time()
         text = data.Field(batch_first=True, tokenize=tokenizer)
         qid = data.Field()
@@ -22,11 +16,11 @@ class DataProcessor():
 
         # read and tokenize data
         print('Reading data.')
-        train = data.TabularDataset(path=train_csv, format='csv',
+        train = MyTabularDataset(path=train_csv, format='csv',
                                     fields={'qid': ('qid', qid),
                                             'question_text': ('text', text),
                                             'target': ('target', target)})
-        test = data.TabularDataset(path=test_csv, format='csv',
+        test = MyTabularDataset(path=test_csv, format='csv',
                                    fields={'qid': ('qid', qid),
                                            'question_text': ('text', text)})
         print_duration(time_start, 'Time to read data?')
@@ -43,7 +37,7 @@ class DataProcessor():
         return train, test, text, qid
 
 
-    def iterate(self, train, val, test, batch_size):
+def iterate(self, train, val, test, batch_size):
         train_iter = data.BucketIterator(dataset=train,
                                          batch_size=batch_size,
                                          sort_key=lambda x: x.text.__len__(),

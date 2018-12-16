@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 import os
 import random
 import torch.nn as nn
@@ -8,24 +9,25 @@ from models import BiLSTM
 from preprocess import preprocess, iterate
 from learner import Learner
 from utils import submit
-from test.create_test_datasets import reduce_embedding, reduce_datasets
+from create_test_datasets import reduce_embedding, reduce_datasets
 
 
 def main(args, train_csv, test_csv, embedding, cache):
     train, test, text, qid = preprocess(train_csv, test_csv, args.tokenizer, embedding, cache)
     random.seed(args.seed)
-    train, val = train.split(split_ratio=args.split_ratio, random_state=random.getstate())
-    train_iter, val_iter, test_iter = iterate(train, val, test, args.batch_size)
-
-    eval_every = len(list(iter(train_iter)))/args.n_eval
-    model = BiLSTM(text.vocab.vectors, lstm_layer=2, padding_idx=text.vocab.stoi[text.pad_token], hidden_dim=128).cuda()
-    # loss_function = nn.BCEWithLogitsLoss(pos_weight=torch.Tensor([pos_w]).cuda())
-    loss_function = nn.BCEWithLogitsLoss()
-    optimizer = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=args.lr)
-    dataloaders = train_iter, val_iter, test_iter
-    learn = Learner(model, dataloaders, loss_function, optimizer)
-    learn.fit(args.epoch, eval_every, args.f1_tresh, args.early_stop, args.warmup_epoch)
-
+    data_iter = train.split_kfold(k=5, random_state=random.getstate())
+    for d in data_iter:
+        train, val = d
+        train_iter, val_iter, test_iter = iterate(train, val, test, args.batch_size)
+        eval_every = len(list(iter(train_iter))) / args.n_eval
+        dataloaders = train_iter, val_iter, test_iter
+        model = BiLSTM(text.vocab.vectors, lstm_layer=2, padding_idx=text.vocab.stoi[text.pad_token],
+                       hidden_dim=128).cuda()
+        # loss_function = nn.BCEWithLogitsLoss(pos_weight=torch.Tensor([pos_w]).cuda())
+        loss_function = nn.BCEWithLogitsLoss()
+        optimizer = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=args.lr)
+        learn = Learner(model, dataloaders, loss_function, optimizer)
+        learn.fit(args.epoch, eval_every, args.f1_tresh, args.early_stop, args.warmup_epoch)
     # predict test labels
     learn.load()
     test_label, _, test_ids = learn.predict_labels(is_test=True, tresh=[0.01, 0.5, 0.01])
@@ -51,7 +53,7 @@ if __name__ == '__main__':
     arg('--embedding', '-em', default='glove', choices=['glove', 'google_news','paragram', 'wiki_news'])
     arg('--f1_tresh', '-ft', default=0.33, type=float)
 
-    args = parser.parse_args(args=[])
+    args = parser.parse_args()
 
 
     if args.embedding == 'glove':
