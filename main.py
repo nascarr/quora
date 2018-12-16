@@ -18,7 +18,7 @@ def main(args, train_csv, test_csv, embedding, cache):
     train, val = train.split(split_ratio=args.split_ratio, random_state=random.getstate())
     train_iter, val_iter, test_iter = iterate(train, val, test, args.batch_size)
 
-    eval_every = len(list(iter(train_iter)))/args.n_eval
+    eval_every = int(len(list(iter(train_iter)))/args.n_eval)
     if args.model == 'BiLSTM':
         model = BiLSTM(text.vocab.vectors, lstm_layer=args.n_layers, padding_idx=text.vocab.stoi[text.pad_token], hidden_dim=args.hidden_dim, dropout=args.dropout).cuda()
     # loss_function = nn.BCEWithLogitsLoss(pos_weight=torch.Tensor([pos_w]).cuda())
