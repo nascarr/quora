@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 import os
+import sys
 import random
 import torch.nn as nn
 import torch.optim as optim
@@ -8,7 +9,7 @@ import argparse
 from models import BiLSTM
 from preprocess import preprocess, iterate
 from learner import Learner
-from utils import submit
+from utils import submit, check_changes_commited
 from create_test_datasets import reduce_embedding, reduce_datasets
 
 
@@ -97,6 +98,7 @@ if __name__ == '__main__':
         emb_small_path = reduce_embedding(emb_path, data_dir, n_cut_emb)
         train_csv, test_csv, emb_path = train_small_csv, test_small_csv, emb_small_path
     elif args.mode == 'run':
-        pass  # all parameters for 'run' mode defined above
+        if not check_changes_commited():
+            sys.exit("Please commit all changes!")
 
     main(args, train_csv, test_csv, emb_path, cache)

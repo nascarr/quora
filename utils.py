@@ -54,3 +54,15 @@ def dict_to_csv(dict, csvname, mode, orient, reverse):
     # TODO: append rows considering columns names
 
 
+def check_changes_commited():
+    message = subprocess.check_output(['git', 'status'])
+    message_str = str(message.decode("utf-8"))
+    required_message = 'On branch master\nnothing to commit, working tree clean\n'
+    if message_str == required_message:
+        status = True
+    else:
+        status = False
+    return status
+
+if __name__ == '__main__':
+    git_tree_clean()
