@@ -1,3 +1,5 @@
+import subprocess
+
 import pandas as pd
 import time
 from datetime import timedelta
@@ -26,3 +28,29 @@ def print_duration(time_start, message):
     seconds = int(time_end - time_start)
     tr_time = timedelta(seconds=seconds)
     print(f'{message}{tr_time}')
+
+
+def get_hash():
+    hash = subprocess.check_output(['git', 'describe', '--always'])
+    hash = hash.decode("utf-8")[1:-1]
+    return hash
+
+
+def str_date_time():
+    struct_time = time.localtime()
+    date_time = time.strftime('%b_%d_%Y__%H:%M:%S', struct_time)
+    return date_time
+
+
+def dict_to_csv(dict, csvname, mode, orient, reverse):
+    if orient == 'index':
+        df = pd.DataFrame.from_dict(dict, orient='index')
+        df.to_csv(csvname, header=False, mode=mode)
+    if orient == 'columns':
+        df = pd.DataFrame(dict, index=[0])
+        if reverse: #reverse dataframe columnes
+            df = df.iloc[:, ::-1]
+        df.to_csv(csvname, index=False, mode=mode)
+    # TODO: append rows considering columns names
+
+
