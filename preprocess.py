@@ -37,7 +37,7 @@ def preprocess(train_csv, test_csv, tokenizer, embeddings, cache):
         return train, test, text, qid
 
 
-def iterate(self, train, val, test, batch_size):
+def iterate(train, val, test, batch_size):
         train_iter = data.BucketIterator(dataset=train,
                                          batch_size=batch_size,
                                          sort_key=lambda x: x.text.__len__(),

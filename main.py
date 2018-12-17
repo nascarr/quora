@@ -15,7 +15,11 @@ from create_test_datasets import reduce_embedding, reduce_datasets
 def main(args, train_csv, test_csv, embedding, cache):
     train, test, text, qid = preprocess(train_csv, test_csv, args.tokenizer, embedding, cache)
     random.seed(args.seed)
-    data_iter = train.split_kfold(k=5, random_state=random.getstate())
+    k = args.kfold
+    if k:
+        data_iter = train.split_kfold(k, random_state=random.getstate())
+    else:
+        data_iter = train.split(args.split_ratio, random_state=random.getstate())
     for d in data_iter:
         train, val = d
         train_iter, val_iter, test_iter = iterate(train, val, test, args.batch_size)
@@ -28,9 +32,9 @@ def main(args, train_csv, test_csv, embedding, cache):
         optimizer = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=args.lr)
         learn = Learner(model, dataloaders, loss_function, optimizer)
         learn.fit(args.epoch, eval_every, args.f1_tresh, args.early_stop, args.warmup_epoch)
-    # predict test labels
-    learn.load()
-    test_label, _, test_ids = learn.predict_labels(is_test=True, tresh=[0.01, 0.5, 0.01])
+        # predict test labels
+        learn.load()
+        test_label, _, test_ids = learn.predict_labels(is_test=True, tresh=[0.01, 0.5, 0.01])
     test_ids = [qid.vocab.itos[i] for i in test_ids]
     submit(test_ids, test_label)
 
@@ -41,6 +45,7 @@ if __name__ == '__main__':
 
     arg('--machine', default='dt', choices=['dt', 'kaggle'])
     arg('--mode', default='run', choices=['test', 'run'])
+    arg('--kfold', '-k', type=int)
     arg('--epoch', '-e', default=7, type=int)
     arg('--lr', '-l', default=1e-3, type=float)
     arg('--batch_size', '-bs', default=512, type=int)
