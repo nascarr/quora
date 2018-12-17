@@ -66,10 +66,12 @@ def check_changes_commited():
     return status
 
 
-def save_loss_plot(losses, n_eval, fname):
-    y = losses
-    x = np.array(range(len(losses))) / n_eval
-    plt.plot(x, y)
-    plt.xlabel('epoch')
-    plt.ylabel('loss')
-    plt.savefig(fname)
+def save_plot(record, key,n_eval):
+    y = [o[key] for o in record]
+    x = np.array(range(len(y))) / n_eval
+    fig, ax = plt.subplots(1, 1)
+    ax.plot(x, y)
+    ax.set_xlabel('epoch')
+    ax.set_ylabel(key)
+    fname = key + '.png'
+    fig.savefig(fname)
