@@ -12,3 +12,4 @@ notebooks/.ipynb_checkpoints
 **/old
 *.pyc
 *.sh
+*.png
