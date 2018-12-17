@@ -6,7 +6,7 @@ import warnings
 import shutil
 import time
 
-from utils import f1_metric, print_duration, get_hash, str_date_time, dict_to_csv
+from utils import f1_metric, print_duration, get_hash, str_date_time, dict_to_csv, save_loss_plot
 
 
 class Learner:
@@ -104,6 +104,7 @@ class Learner:
                         self.save(info)
                         max_f1 = val_record[-1]['f1_score']
                         no_improve_in_previous_epoch = False
+        save_loss_plot([o['loss'] for o in val_record], self.args.n_eval, 'val_losses.png')
         print_duration(time_start, 'Training time: ')
         m_info = self.load()
         print(f'Best model: {m_info}')
@@ -193,6 +194,7 @@ class Learner:
         dict_to_csv(param_dict, csvlog, 'w', 'index', reverse=False)
         dict_to_csv(param_dict, self.record_path, 'a', 'columns', reverse=True)
         shutil.copy(self.best_model_path, subdir)
+        shutil.copy('val_losses.png', subdir)
 
 
     def load(self):

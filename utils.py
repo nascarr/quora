@@ -1,8 +1,9 @@
 import subprocess
-
 import pandas as pd
+import numpy as np
 import time
 from datetime import timedelta
+import matplotlib.pyplot as plt
 
 def submit(test_ids, prediciton, subm_name='submission.csv'):
     sub_df = pd.DataFrame()
@@ -64,5 +65,11 @@ def check_changes_commited():
         status = False
     return status
 
-if __name__ == '__main__':
-    git_tree_clean()
+
+def save_loss_plot(losses, n_eval, fname):
+    y = losses
+    x = np.array(range(len(losses))) / n_eval
+    plt.plot(x, y)
+    plt.xlabel('epoch')
+    plt.ylabel('loss')
+    plt.savefig(fname)
