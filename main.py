@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+
 import os
 import sys
 import random
@@ -21,6 +22,7 @@ def parse_script_args():
     arg('--mode', default='run', choices=['test', 'run'])
 
     # data preprocessing params
+    arg('--kfold', '-k', type=int)
     arg('--split_ratio', '-sr', default=0.8, type=float)
     arg('--seed', default=2018, type=int)
     arg('--tokenizer', '-t', default='spacy', choices=['spacy'])
@@ -43,7 +45,6 @@ def parse_script_args():
     arg('--dropout', '-d', type=float, default=0.2)
 
     args = parser.parse_args()
-
     return args
 
 
@@ -84,29 +85,32 @@ def analyze_args(args):
 def main(args, train_csv, test_csv, embedding, cache):
     train, test, text, qid = preprocess(train_csv, test_csv, args.tokenizer, embedding, cache)
     random.seed(args.seed)
-    train, val = train.split(split_ratio=args.split_ratio, random_state=random.getstate())
-    train_iter, val_iter, test_iter = iterate(train, val, test, args.batch_size)
-
-    eval_every = int(len(list(iter(train_iter)))/args.n_eval)
-    if args.model == 'BiLSTM':
-        model = BiLSTM(text.vocab.vectors,
-                       lstm_layer=args.n_layers,
-                       padding_idx=text.vocab.stoi[text.pad_token],
-                       hidden_dim=args.hidden_dim,
-                       dropout=args.dropout).cuda()
-    # loss_function = nn.BCEWithLogitsLoss(pos_weight=torch.Tensor([pos_w]).cuda())
-    loss_function = nn.BCEWithLogitsLoss()
-    if args.optim == 'Adam':
-        optimizer = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=args.lr)
-    elif args.optim == 'AdamW':
-        optimizer = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=args.lr, betas=(0.9, 0.99))
-    dataloaders = train_iter, val_iter, test_iter
-    learn = Learner(model, dataloaders, loss_function, optimizer, args)
-    learn.fit(args.epoch, eval_every, args.f1_tresh, args.early_stop, args.warmup_epoch)
-
-    # predict test labels
-    learn.load()
-    test_label, _, test_ids = learn.predict_labels(is_test=True, tresh=[0.01, 0.5, 0.01])
+    k = args.kfold
+    if k:
+        data_iter = train.split_kfold(k, random_state=random.getstate())
+    else:
+        data_iter = train.split(args.split_ratio, random_state=random.getstate())
+    for d in data_iter:
+        train, val = d
+        train_iter, val_iter, test_iter = iterate(train, val, test, args.batch_size)
+        eval_every = int(len(list(iter(train_iter))) / args.n_eval)
+        dataloaders = train_iter, val_iter, test_iter
+        if args.model == 'BiLSTM':
+            model = BiLSTM(text.vocab.vectors,
+                           lstm_layer=args.n_layers,
+                           padding_idx=text.vocab.stoi[text.pad_token],
+                           hidden_dim=args.hidden_dim,
+                           dropout=args.dropout).cuda()
+        if args.optim == 'Adam':
+            optimizer = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=args.lr)
+        elif args.optim == 'AdamW':
+            optimizer = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=args.lr, betas=(0.9, 0.99))
+        loss_function = nn.BCEWithLogitsLoss()
+        learn = Learner(model, dataloaders, loss_function, optimizer, args)
+        learn.fit(args.epoch, eval_every, args.f1_tresh, args.early_stop, args.warmup_epoch)
+        # predict test labels
+        learn.load()
+        test_label, _, test_ids = learn.predict_labels(is_test=True, tresh=[0.01, 0.5, 0.01])
     learn.record()
     test_ids = [qid.vocab.itos[i] for i in test_ids]
     submit(test_ids, test_label)

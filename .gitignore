@@ -11,5 +11,5 @@ notebooks/.ipynb_checkpoints
 **/__pycache__
 **/old
 *.pyc
-*.sh
 *.png
+*.sh
