@@ -29,6 +29,8 @@ class Learner:
             self.train_dl = dataloaders
             self.val_dl = None
         self.args = args
+        self.val_record = []
+        self.train_record = []
         if self.args.mode == 'test':
             self.record_path = './notes/test_records.csv'
         elif self.args.mode == 'run':
@@ -42,8 +44,6 @@ class Learner:
         no_improve_epoch = 0
         no_improve_in_previous_epoch = False
         fine_tuning = False
-        train_record = []
-        val_record = []
         losses = []
 
         torch.backends.cudnn.benchmark = True
@@ -69,16 +69,15 @@ class Learner:
                 pred = self.model.forward(x).view(-1)
                 loss = self.loss_func(pred, y)
                 losses.append(loss.cpu().data.numpy())
-                train_record.append({'tr_loss': loss.cpu().data.numpy()})
+                self.train_record.append({'tr_loss': loss.cpu().data.numpy()})
                 loss.backward()
                 self.optimizer.step()
                 if step % eval_every == 0:
                     val_loss, val_f1 = self.evaluate(self.val_dl, tresh)
                     train_loss = np.mean(losses)
-                    val_record.append({'step': step, 'loss': val_loss, 'f1_score': val_f1})
-                    info = {'best_ep': e, 'step': step, 'train_loss': train_loss,
-                            'val_loss': val_loss, 'f1_score': val_f1}
-                    info = self.format_info(info)
+                    self.val_record.append({'step': step, 'loss': val_loss, 'val_f1': val_f1})
+                    info = self.format_info(info = {'best_ep': e, 'step': step, 'train_loss': train_loss,
+                            'val_loss': val_loss, 'val_f1': val_f1})
                     print('epoch {:02} - step {:06} - train_loss {:.4f} - val_loss {:.4f} - f1 {:.4f}'.format(
                         *list(info.values())))
                     if val_f1  >= max_f1:
@@ -89,13 +88,9 @@ class Learner:
         # calculate train loss and train f1_score
         print('Evaluating model on train dataset')
         train_loss, train_f1 = self.evaluate(self.train_dl, tresh)
-        tr_info = {'train_loss':train_loss, 'train_f1':train_f1}
-        tr_info = self.format_info(tr_info)
+        tr_info = self.format_info({'train_loss':train_loss, 'train_f1':train_f1})
         print(tr_info)
         self.append_info(tr_info)
-        save_plot(val_record, 'loss',self.args.n_eval)
-        save_plot(val_record, 'f1_score', self.args.n_eval)
-        save_plot(train_record, 'tr_loss', self.args.n_eval)
         m_info = self.load()
         print(f'Best model: {m_info}')
 
@@ -190,12 +185,19 @@ class Learner:
         torch.save(info, cls.best_info_path)
 
     def record(self):
+        # save plots
+        save_plot(self.val_record, 'loss', self.args.n_eval)
+        save_plot(self.val_record, 'val_f1', self.args.n_eval)
+        save_plot(self.train_record, 'tr_loss', self.args.n_eval)
+
+        # create subdir for this experiment
         os.makedirs(self.record_dir, exist_ok=True)
         subdir = os.path.join(self.models_dir, str_date_time())
         if self.args.mode == 'test':
             subdir +=  '_test'
         os.mkdir(subdir)
 
+        # write model params and results to csv
         csvlog = os.path.join(subdir, 'info.csv')
         param_dict = {}
         for arg in vars(self.args):
@@ -206,6 +208,8 @@ class Learner:
         param_dict = {'hash':hash, 'subdir':subdir, **param_dict, **info, 'args': passed_args}
         dict_to_csv(param_dict, csvlog, 'w', 'index', reverse=False)
         dict_to_csv(param_dict, self.record_path, 'a', 'columns', reverse=True)
+
+        # copy all records to subdir
         copy_files(['*.png', 'models/*.m', 'models/*.info'], subdir)
 
     def load(self):
