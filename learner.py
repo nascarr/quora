@@ -17,10 +17,11 @@ class Learner:
     best_info_path = './models/best_model.info'
     record_dir = './notes'
 
-    def __init__(self, model, dataloaders, loss_func, optimizer, args):
+    def __init__(self, model, dataloaders, loss_func, optimizer, scheduler, args):
         self.model = model
         self.loss_func = loss_func
         self.optimizer = optimizer
+        self.scheduler = scheduler
         if len(dataloaders) == 3:
             self.train_dl, self.val_dl, self.test_dl = dataloaders
         elif len(dataloaders) == 2:
@@ -45,9 +46,10 @@ class Learner:
         no_improve_in_previous_epoch = False
         fine_tuning = False
         losses = []
-
         torch.backends.cudnn.benchmark = True
+
         for e in range(epoch):
+            self.scheduler.step()
             if e >= warmup_epoch:
                 if no_improve_in_previous_epoch:
                     no_improve_epoch += 1
@@ -60,6 +62,7 @@ class Learner:
                 self.model.embedding.weight.requires_grad = True
                 fine_tuning = True
             self.train_dl.init_epoch()
+
             for train_batch in iter(self.train_dl):
                 step += 1
                 self.model.zero_grad()
@@ -85,12 +88,14 @@ class Learner:
                         max_f1 = val_f1
                         no_improve_in_previous_epoch = False
         print_duration(time_start, 'Training time: ')
+
         # calculate train loss and train f1_score
         print('Evaluating model on train dataset')
         train_loss, train_f1 = self.evaluate(self.train_dl, tresh)
         tr_info = self.format_info({'train_loss':train_loss, 'train_f1':train_f1})
         print(tr_info)
         self.append_info(tr_info)
+
         m_info = self.load()
         print(f'Best model: {m_info}')
 
@@ -216,4 +221,3 @@ class Learner:
         self.model = torch.load(self.best_model_path)
         info = torch.load(self.best_info_path)
         return info
-
