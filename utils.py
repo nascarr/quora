@@ -4,6 +4,8 @@ import numpy as np
 import time
 from datetime import timedelta
 import matplotlib.pyplot as plt
+import glob
+import shutil
 
 def submit(test_ids, prediciton, subm_name='submission.csv'):
     sub_df = pd.DataFrame()
@@ -75,3 +77,9 @@ def save_plot(record, key,n_eval):
     ax.set_ylabel(key)
     fname = key + '.png'
     fig.savefig(fname)
+
+
+def copy_files(arg_list, dest_dir):
+    for a in arg_list:
+        for file in glob.glob(a):
+            shutil.copy(file, dest_dir)
