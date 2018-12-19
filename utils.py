@@ -59,9 +59,10 @@ def dict_to_csv(dict, csvname, mode, orient, reverse):
 
 def check_changes_commited():
     message = subprocess.check_output(['git', 'status'])
-    message_str = str(message.decode("utf-8"))
-    required_message = 'On branch master\nnothing to commit, working tree clean\n'
-    if message_str == required_message:
+    message_last_line = str(message.decode("utf-8")).split('\n')[-2]
+    print(message_last_line)
+    required_last_line = 'nothing to commit, working tree clean'
+    if message_last_line == required_last_line:
         status = True
     else:
         status = False
