@@ -58,9 +58,9 @@ class Learner:
                 else:
                     no_improve_epoch = 0
                 no_improve_in_previous_epoch = True
-            # if not fine_tuning and e >= warmup_epoch:
-            #    self.model.embedding.weight.requires_grad = True
-            #    fine_tuning = True
+            if not fine_tuning and e >= warmup_epoch:
+                self.model.embedding.weight.requires_grad = True
+                fine_tuning = True
             self.train_dl.init_epoch()
 
             for train_batch in iter(self.train_dl):
@@ -71,22 +71,23 @@ class Learner:
                 y = train_batch.target.type(torch.Tensor).cuda()
                 pred = self.model.forward(x).view(-1)
                 loss = self.loss_func(pred, y)
-                losses.append(loss.cpu().data.numpy())
                 self.train_record.append({'tr_loss': loss.cpu().data.numpy()})
                 loss.backward()
                 self.optimizer.step()
-                if step % eval_every == 0:
-                    val_loss, val_f1 = self.evaluate(self.val_dl, tresh)
+                with torch.no_grad():
+                    losses.append(loss.cpu().data.numpy())
                     train_loss = np.mean(losses)
-                    self.val_record.append({'step': step, 'loss': val_loss, 'val_f1': val_f1})
-                    info = self.format_info(info = {'best_ep': e, 'step': step, 'train_loss': train_loss,
-                            'val_loss': val_loss, 'val_f1': val_f1})
-                    print('epoch {:02} - step {:06} - train_loss {:.4f} - val_loss {:.4f} - f1 {:.4f}'.format(
-                        *list(info.values())))
-                    if val_f1  >= max_f1:
-                        self.save(info)
-                        max_f1 = val_f1
-                        no_improve_in_previous_epoch = False
+                    if step % eval_every == 0:
+                        val_loss, val_f1 = self.evaluate(self.val_dl, tresh)
+                        self.val_record.append({'step': step, 'loss': val_loss, 'val_f1': val_f1})
+                        info = self.format_info(info = {'best_ep': e, 'step': step, 'train_loss': train_loss,
+                                'val_loss': val_loss, 'val_f1': val_f1})
+                        print('epoch {:02} - step {:06} - train_loss {:.4f} - val_loss {:.4f} - f1 {:.4f}'.format(
+                            *list(info.values())))
+                        if val_f1  >= max_f1:
+                            self.save(info)
+                            max_f1 = val_f1
+                            no_improve_in_previous_epoch = False
         print_duration(time_start, 'Training time: ')
 
         # calculate train loss and train f1_score
@@ -100,25 +101,26 @@ class Learner:
         print(f'Best model: {m_info}')
 
     def evaluate(self, dl, tresh):
-        self.train_dl.init_epoch()
-        self.model.eval()
-        self.model.zero_grad()
-        loss = []
-        tp = 0
-        n_targs = 0
-        n_preds = 0
-        for batch in iter(dl):
-            x = batch.text.cuda()
-            y = batch.target.type(torch.Tensor).cuda()
-            pred = self.model.forward(x).view(-1)
-            loss.append(self.loss_func(pred, y).cpu().data.numpy())
-            label = (torch.sigmoid(pred).cpu().data.numpy() > tresh).astype(int)
-            y = y.cpu().data.numpy()
-            tp += sum(y + label == 2)
-            n_targs += sum(y)
-            n_preds += sum(label)
-        f1 = f1_metric(tp, n_targs, n_preds)
-        loss = np.mean(loss)
+        with torch.no_grad():
+            self.train_dl.init_epoch()
+            self.model.eval()
+            self.model.zero_grad()
+            loss = []
+            tp = 0
+            n_targs = 0
+            n_preds = 0
+            for batch in iter(dl):
+                x = batch.text.cuda()
+                y = batch.target.type(torch.Tensor).cuda()
+                pred = self.model.forward(x).view(-1)
+                loss.append(self.loss_func(pred, y).cpu().data.numpy())
+                label = (torch.sigmoid(pred).cpu().data.numpy() > tresh).astype(int)
+                y = y.cpu().data.numpy()
+                tp += sum(y + label == 2)
+                n_targs += sum(y)
+                n_preds += sum(label)
+            f1 = f1_metric(tp, n_targs, n_preds)
+            loss = np.mean(loss)
         return loss, f1
 
     def predict_probs(self, is_test=False):
