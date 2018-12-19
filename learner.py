@@ -12,11 +12,6 @@ import sys
 
 class Learner:
 
-    models_dir = './models'
-    best_model_path = './models/best_model.m'
-    best_info_path = './models/best_model.info'
-    record_dir = './notes'
-
     def __init__(self, model, dataloaders, loss_func, optimizer, scheduler, args):
         self.model = model
         self.loss_func = loss_func
@@ -29,13 +24,7 @@ class Learner:
         elif len(dataloaders) == 1:
             self.train_dl = dataloaders
             self.val_dl = None
-        self.args = args
-        self.val_record = []
-        self.train_record = []
-        if self.args.mode == 'test':
-            self.record_path = './notes/test_records.csv'
-        elif self.args.mode == 'run':
-            self.record_path = './notes/records.csv'
+        self.recorder = Recorder(self.model, args)
 
     def fit(self, epoch, eval_every, tresh, early_stop=1, warmup_epoch=2):
         print('Start training!')
@@ -169,10 +158,32 @@ class Learner:
         y_label = (np.array(y_pred) >= tresh).astype(int)
         return y_label, y_true, ids
 
-    def save(self, info):
+
+class Recorder():
+
+    models_dir = './models'
+    best_model_path = './models/best_model.m'
+    best_info_path = './models/best_model.info'
+    record_dir = './notes'
+
+    def __init__(self, args):
+        self.args = args
+        self.val_record = []
+        self.train_record = []
+        if self.args.mode == 'test':
+            self.record_path = './notes/test_records.csv'
+        elif self.args.mode == 'run':
+            self.record_path = './notes/records.csv'
+
+    def save(self, model, info):
         os.makedirs(self.models_dir, exist_ok=True)
-        torch.save(self.model, self.best_model_path)
+        torch.save(model, self.best_model_path)
         torch.save(info, self.best_info_path)
+
+    def load(self):
+        model = torch.load(self.best_model_path)
+        info = torch.load(self.best_info_path)
+        return model, info
 
     @staticmethod
     def format_info(info):
@@ -216,8 +227,3 @@ class Learner:
 
         # copy all records to subdir
         copy_files(['*.png', 'models/*.m', 'models/*.info'], subdir)
-
-    def load(self):
-        self.model = torch.load(self.best_model_path)
-        info = torch.load(self.best_info_path)
-        return info
