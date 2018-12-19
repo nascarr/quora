@@ -60,7 +60,6 @@ def dict_to_csv(dict, csvname, mode, orient, reverse):
 def check_changes_commited():
     message = subprocess.check_output(['git', 'status'])
     message_last_line = str(message.decode("utf-8")).split('\n')[-2]
-    print(message_last_line)
     required_last_line = 'nothing to commit, working tree clean'
     if message_last_line == required_last_line:
         status = True

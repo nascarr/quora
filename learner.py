@@ -58,9 +58,9 @@ class Learner:
                 else:
                     no_improve_epoch = 0
                 no_improve_in_previous_epoch = True
-            if not fine_tuning and e >= warmup_epoch:
-                self.model.embedding.weight.requires_grad = True
-                fine_tuning = True
+            # if not fine_tuning and e >= warmup_epoch:
+            #    self.model.embedding.weight.requires_grad = True
+            #    fine_tuning = True
             self.train_dl.init_epoch()
 
             for train_batch in iter(self.train_dl):
