@@ -90,7 +90,7 @@ def main(args, train_csv, test_csv, embedding, cache):
     random.seed(args.seed)
     k = args.kfold
     if k:
-        data_iter = train.split_kfold(k, random_state=random.getstate())
+        data_iter = train.split_kfold(k, is_test=True, random_state=random.getstate())
     else:
         data_iter = train.split(args.split_ratio, random_state=random.getstate())
 
@@ -105,7 +105,7 @@ def main(args, train_csv, test_csv, embedding, cache):
         optimizer = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=args.lr)
     elif args.optim == 'AdamW':
         optimizer = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=args.lr, betas=(0.9, 0.99))
-    scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=[3, 4], gamma=0.1)
+    scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=[10], gamma=0.1)
     loss_function = nn.BCEWithLogitsLoss()
 
     # iterate through folds
@@ -124,8 +124,10 @@ def main(args, train_csv, test_csv, embedding, cache):
         learn.load()
         test_label, _, test_ids, tresh = learn.predict_labels(is_test=True, tresh=[0.01, 0.5, 0.01])
         if len(d) == 3:
-            print('test loss, f1;', learn.evaluate(learn.test_dl, tresh))
-    learn.record()
+            test_loss, test_f1 = learn.evaluate(learn.test_dl, tresh)
+            test_info = {'test_loss': test_loss, 'test_f1': test_f1}
+            learn.append_info(test_info)
+        learn.record()
     test_ids = [qid.vocab.itos[i] for i in test_ids]
     submit(test_ids, test_label)
 

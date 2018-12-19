@@ -6,8 +6,8 @@ import warnings
 import shutil
 import time
 import subprocess
-from utils import f1_metric, print_duration, get_hash, str_date_time, dict_to_csv, save_plot, copy_files
 import sys
+from utils import f1_metric, print_duration, get_hash, str_date_time, dict_to_csv, save_plot, copy_files
 
 
 class Learner:
