@@ -169,7 +169,7 @@ class Learner:
             self.append_info({'best_tr': tresh, 'best_f1': max_f1})
 
         y_label = (np.array(y_pred) >= tresh).astype(int)
-        return y_label, y_true, ids
+        return y_label, y_true, ids, tresh
 
     def save(self, info):
         os.makedirs(self.models_dir, exist_ok=True)
@@ -208,7 +208,7 @@ class Learner:
         csvlog = os.path.join(subdir, 'info.csv')
         param_dict = {}
         for arg in vars(self.args):
-            param_dict[arg] = getattr(self.args, arg)
+            param_dict[arg] = str(getattr(self.args, arg))
         info = torch.load(self.best_info_path)
         hash = get_hash()
         passed_args = ' '.join(sys.argv[1:])

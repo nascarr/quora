@@ -23,7 +23,7 @@ def parse_script_args():
 
     # data preprocessing params
     arg('--kfold', '-k', type=int)
-    arg('--split_ratio', '-sr', default=0.8, type=float)
+    arg('--split_ratio', '-sr', nargs='+', default=0.8, type=float)
     arg('--seed', default=2018, type=int)
     arg('--tokenizer', '-t', default='spacy', choices=['spacy'])
     arg('--embedding', '-em', default='glove', choices=['glove', 'google_news', 'paragram', 'wiki_news'])
@@ -45,6 +45,7 @@ def parse_script_args():
     arg('--dropout', '-d', type=float, default=0.2)
 
     args = parser.parse_args()
+    print(args)
     return args
 
 
@@ -109,7 +110,11 @@ def main(args, train_csv, test_csv, embedding, cache):
 
     # iterate through folds
     for d in data_iter:
-        train, val = d
+        print(len(d))
+        if len(d) == 2:
+            train, val = d
+        else:
+            train, val, test = d
         train_iter, val_iter, test_iter = iterate(train, val, test, args.batch_size)
         eval_every = int(len(list(iter(train_iter))) / args.n_eval)
         dataloaders = train_iter, val_iter, test_iter
@@ -117,8 +122,9 @@ def main(args, train_csv, test_csv, embedding, cache):
         learn.fit(args.epoch, eval_every, args.f1_tresh, args.early_stop, args.warmup_epoch)
         # predict test labels
         learn.load()
-        test_label, _, test_ids = learn.predict_labels(is_test=True, tresh=[0.01, 0.5, 0.01])
-
+        test_label, _, test_ids, tresh = learn.predict_labels(is_test=True, tresh=[0.01, 0.5, 0.01])
+        if len(d) == 3:
+            print('test loss, f1;', learn.evaluate(learn.test_dl, tresh))
     learn.record()
     test_ids = [qid.vocab.itos[i] for i in test_ids]
     submit(test_ids, test_label)
