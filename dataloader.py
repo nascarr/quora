@@ -4,22 +4,36 @@ import numpy as np
 
 class MyTabularDataset(TabularDataset):
     """Subclass of torch.data.dataset.TabularDataset for k-fold cross-validation"""
-    def split(self, split_ratio=0.7, stratified=False, strata_field='label',
+    def split(self, split_ratio=0.8, stratified=False, strata_field='label',
               random_state=None):
-        splits = super().split(split_ratio=0.7, stratified=False, strata_field='label', random_state=None)
+        splits = super().split(split_ratio, stratified, strata_field, random_state)
         return [splits]
 
-    def split_kfold(self, k, stratified=False, test=False, random_state=None):
+    def split_kfold(self, k, stratified=False, is_test=False, random_state=None):
         def _iter_folds():
             i = 0
             while i < k:
-                start_idx = cut_idxs[i]
-                end_idx = cut_idxs[i + 1]
-                train_index = randperm[0:start_idx] + randperm[end_idx:N]
-                val_index = randperm[start_idx:end_idx]
-                train_data, val_data = tuple([self.examples[idx] for idx in index] for index in [train_index, val_index])
+                # val index
+                val_start_idx = cut_idxs[(i+1)%k]
+                val_end_idx = cut_idxs[(i + 2)%k]
+                val_index = randperm[val_start_idx:val_end_idx]
+
+                # test index
+                if is_test:
+                    test_start_idx = cut_idxs[i]
+                    test_end_idx = cut_idxs[i + 1]
+                    test_index = randperm[test_start_idx:test_end_idx]
+                else:
+                    test_index = []
+
+                # train index
+                train_index = list(set(randperm) - set(test_index) - set(val_index))
+
+                # split examples by index and create datasets
+                train_data, val_data, test_data = tuple([self.examples[idx] for idx in index]
+                                                        for index in [train_index, val_index, test_index])
                 splits = tuple(Dataset(d, self.fields)
-                               for d in (train_data, val_data))
+                               for d in (train_data, val_data, test_data) if d)
 
                 # In case the parent sort key isn't none
                 if self.sort_key:

@@ -59,9 +59,9 @@ def dict_to_csv(dict, csvname, mode, orient, reverse):
 
 def check_changes_commited():
     message = subprocess.check_output(['git', 'status'])
-    message_str = str(message.decode("utf-8"))
-    required_message = 'On branch master\nnothing to commit, working tree clean\n'
-    if message_str == required_message:
+    message_last_line = str(message.decode("utf-8")).split('\n')[-2]
+    required_last_line = 'nothing to commit, working tree clean'
+    if message_last_line == required_last_line:
         status = True
     else:
         status = False
@@ -78,6 +78,19 @@ def save_plot(record, key,n_eval):
     fname = key + '.png'
     fig.savefig(fname)
 
+def save_plots(records, keys, labels, n_eval):
+    for k in keys:
+        fig, ax = plt.subplots(1, 1)
+        ax.set_xlabel('epoch')
+        ax.set_ylabel(k)
+        for r, l in zip(records, labels):
+            y = [o[k] for o in r]
+            x = np.array(range(len(y))) / n_eval
+            ax.plot(x, y, label=l)
+        plt.legend()
+        fname = k + '.png'
+        fig.savefig(fname)
+        plt.close()
 
 def copy_files(arg_list, dest_dir):
     for a in arg_list:

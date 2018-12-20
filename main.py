@@ -23,7 +23,7 @@ def parse_script_args():
 
     # data preprocessing params
     arg('--kfold', '-k', type=int)
-    arg('--split_ratio', '-sr', default=0.8, type=float)
+    arg('--split_ratio', '-sr', nargs='+', default=0.8, type=float)
     arg('--seed', default=2018, type=int)
     arg('--tokenizer', '-t', default='spacy', choices=['spacy'])
     arg('--embedding', '-em', default='glove', choices=['glove', 'google_news', 'paragram', 'wiki_news'])
@@ -45,6 +45,7 @@ def parse_script_args():
     arg('--dropout', '-d', type=float, default=0.2)
 
     args = parser.parse_args()
+    print(args)
     return args
 
 
@@ -67,7 +68,7 @@ def analyze_args(args):
         # create smaller files for testing main function
         n_cut = 1000
         n_cut_emb = 10000
-        args.batch_size = n_cut/5
+        args.batch_size = n_cut/100
 
         if args.machine == 'kaggle':
             data_dir = '.'
@@ -89,37 +90,44 @@ def main(args, train_csv, test_csv, embedding, cache):
     random.seed(args.seed)
     k = args.kfold
     if k:
-        data_iter = train.split_kfold(k, random_state=random.getstate())
+        data_iter = train.split_kfold(k, is_test=True, random_state=random.getstate())
     else:
         data_iter = train.split(args.split_ratio, random_state=random.getstate())
 
-    # choose model, optimizer, lr scheduler and loss function
-    if args.model == 'BiLSTM':
-        model = BiLSTM(text.vocab.vectors,
-                       lstm_layer=args.n_layers,
-                       padding_idx=text.vocab.stoi[text.pad_token],
-                       hidden_dim=args.hidden_dim,
-                       dropout=args.dropout).cuda()
-    if args.optim == 'Adam':
-        optimizer = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=args.lr)
-    elif args.optim == 'AdamW':
-        optimizer = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=args.lr, betas=(0.9, 0.99))
-    scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=[3, 4], gamma=0.1)
-    loss_function = nn.BCEWithLogitsLoss()
-
     # iterate through folds
     for d in data_iter:
-        train, val = d
+        print(len(d))
+        if len(d) == 2:
+            train, val = d
+        else:
+            train, val, test = d
         train_iter, val_iter, test_iter = iterate(train, val, test, args.batch_size)
         eval_every = int(len(list(iter(train_iter))) / args.n_eval)
         dataloaders = train_iter, val_iter, test_iter
+
+        # choose model, optimizer, lr scheduler and loss function
+        if args.model == 'BiLSTM':
+            model = BiLSTM(text.vocab.vectors,
+                           lstm_layer=args.n_layers,
+                           padding_idx=text.vocab.stoi[text.pad_token],
+                           hidden_dim=args.hidden_dim,
+                           dropout=args.dropout).cuda()
+        if args.optim == 'Adam':
+            optimizer = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=args.lr)
+        elif args.optim == 'AdamW':
+            optimizer = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=args.lr, betas=(0.9, 0.99))
+        scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=[10], gamma=0.1)
+        loss_function = nn.BCEWithLogitsLoss()
         learn = Learner(model, dataloaders, loss_function, optimizer, scheduler, args)
         learn.fit(args.epoch, eval_every, args.f1_tresh, args.early_stop, args.warmup_epoch)
+
         # predict test labels
         learn.load()
-        test_label, _, test_ids = learn.predict_labels(is_test=True, tresh=[0.01, 0.5, 0.01])
-
-    learn.record()
+        test_label, _, test_ids, tresh = learn.predict_labels(is_test=True, tresh = args.f1_tresh)
+        if len(d) == 3:
+            test_loss_old, test_f1_old = learn.evaluate(learn.test_dl, args.f1_tresh)
+            print('Test results at point with best va lidation f1:', test_loss_old, test_f1_old)
+        learn.record()
     test_ids = [qid.vocab.itos[i] for i in test_ids]
     submit(test_ids, test_label)
 
