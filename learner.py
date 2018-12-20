@@ -26,9 +26,10 @@ class Learner:
             self.train_dl, self.val_dl, self.test_dl = dataloaders
         elif len(dataloaders) == 2:
             self.train_dl, self.val_dl = dataloaders
+            self.test_dl = None
         elif len(dataloaders) == 1:
             self.train_dl = dataloaders
-            self.val_dl = None
+            self.val_dl = self.test_dl = None
         self.args = args
         self.val_record = []
         self.train_record = []
@@ -42,11 +43,13 @@ class Learner:
         time_start = time.time()
         step = 0
         max_f1 = 0
+        max_test_f1 = 0
         no_improve_epoch = 0
         no_improve_in_previous_epoch = False
         fine_tuning = False
         losses = []
         torch.backends.cudnn.benchmark = True
+        best_test_info = None
 
         for e in range(epoch):
             self.scheduler.step()
@@ -88,6 +91,19 @@ class Learner:
                             self.save(info)
                             max_f1 = val_f1
                             no_improve_in_previous_epoch = False
+
+                        if 'target' in next(iter(self.test_dl)).fields:
+                            test_loss, test_f1 =  self.evaluate(self.test_dl, tresh)
+                            test_info = {'test_loss': test_loss, 'test_f1': test_f1, 'test_step': step, 'test_ep': e}
+                            print(test_info)
+                            if test_f1 >= max_test_f1:
+                                max_test_f1 = test_f1
+                                best_test_info = test_info
+
+        if best_test_info:
+            self.append_info(best_test_info)
+            print('Best results for test:', best_test_info)
+
         print_duration(time_start, 'Training time: ')
 
         # calculate train loss and train f1_score
@@ -102,7 +118,7 @@ class Learner:
 
     def evaluate(self, dl, tresh):
         with torch.no_grad():
-            self.train_dl.init_epoch()
+            dl.init_epoch()
             self.model.eval()
             self.model.zero_grad()
             loss = []
@@ -173,7 +189,8 @@ class Learner:
 
     def save(self, info):
         os.makedirs(self.models_dir, exist_ok=True)
-        torch.save(self.model, self.best_model_path)
+        if self.args.mode == 'run':
+            torch.save(self.model, self.best_model_path)
         torch.save(info, self.best_info_path)
 
     @staticmethod

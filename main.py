@@ -94,20 +94,6 @@ def main(args, train_csv, test_csv, embedding, cache):
     else:
         data_iter = train.split(args.split_ratio, random_state=random.getstate())
 
-    # choose model, optimizer, lr scheduler and loss function
-    if args.model == 'BiLSTM':
-        model = BiLSTM(text.vocab.vectors,
-                       lstm_layer=args.n_layers,
-                       padding_idx=text.vocab.stoi[text.pad_token],
-                       hidden_dim=args.hidden_dim,
-                       dropout=args.dropout).cuda()
-    if args.optim == 'Adam':
-        optimizer = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=args.lr)
-    elif args.optim == 'AdamW':
-        optimizer = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=args.lr, betas=(0.9, 0.99))
-    scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=[10], gamma=0.1)
-    loss_function = nn.BCEWithLogitsLoss()
-
     # iterate through folds
     for d in data_iter:
         print(len(d))
@@ -118,15 +104,26 @@ def main(args, train_csv, test_csv, embedding, cache):
         train_iter, val_iter, test_iter = iterate(train, val, test, args.batch_size)
         eval_every = int(len(list(iter(train_iter))) / args.n_eval)
         dataloaders = train_iter, val_iter, test_iter
+
+        # choose model, optimizer, lr scheduler and loss function
+        if args.model == 'BiLSTM':
+            model = BiLSTM(text.vocab.vectors,
+                           lstm_layer=args.n_layers,
+                           padding_idx=text.vocab.stoi[text.pad_token],
+                           hidden_dim=args.hidden_dim,
+                           dropout=args.dropout).cuda()
+        if args.optim == 'Adam':
+            optimizer = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=args.lr)
+        elif args.optim == 'AdamW':
+            optimizer = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=args.lr, betas=(0.9, 0.99))
+        scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=[10], gamma=0.1)
+        loss_function = nn.BCEWithLogitsLoss()
         learn = Learner(model, dataloaders, loss_function, optimizer, scheduler, args)
         learn.fit(args.epoch, eval_every, args.f1_tresh, args.early_stop, args.warmup_epoch)
+
         # predict test labels
         learn.load()
         test_label, _, test_ids, tresh = learn.predict_labels(is_test=True, tresh=[0.01, 0.5, 0.01])
-        if len(d) == 3:
-            test_loss, test_f1 = learn.evaluate(learn.test_dl, tresh)
-            test_info = {'test_loss': test_loss, 'test_f1': test_f1}
-            learn.append_info(test_info)
         learn.record()
     test_ids = [qid.vocab.itos[i] for i in test_ids]
     submit(test_ids, test_label)
