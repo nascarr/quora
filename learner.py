@@ -94,18 +94,18 @@ class Learner:
                             max_f1 = val_f1
                             no_improve_in_previous_epoch = False
 
-                        if 'target' in next(iter(self.test_dl)).fields:
+                        """if 'target' in next(iter(self.test_dl)).fields:
                             test_loss, test_f1 =  self.evaluate(self.test_dl, tresh)
                             test_info = {'test_ep': e, 'test_step': step, 'test_loss': test_loss, 'test_f1': test_f1}
                             self.test_record.append({'step': step, 'loss': test_loss, 'f1': test_f1})
                             print('epoch {:02} - step {:06} - test_loss {:.4f} - test_f1 {:.4f}'.format(*list(test_info.values())))
                             if test_f1 >= max_test_f1:
                                 max_test_f1 = test_f1
-                                best_test_info = test_info
+                                best_test_info = test_info"""
 
-        if best_test_info:
+        """"if best_test_info:
             self.append_info(best_test_info)
-            print('Best results for test:', best_test_info)
+            print('Best results for test:', best_test_info)"""
 
         print_duration(time_start, 'Training time: ')
 
