@@ -124,6 +124,9 @@ def main(args, train_csv, test_csv, embedding, cache):
         # predict test labels
         learn.load()
         test_label, _, test_ids, tresh = learn.predict_labels(is_test=True, tresh=[0.01, 0.5, 0.01])
+        if len(d) == 3:
+            test_loss_old, test_f1_old = learn.evaluate(learn.test_dl, tresh)
+            print('Test results at point with best validation f1:', test_loss_old, test_f1_old)
         learn.record()
     test_ids = [qid.vocab.itos[i] for i in test_ids]
     submit(test_ids, test_label)
