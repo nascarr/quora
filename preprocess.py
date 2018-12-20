@@ -53,5 +53,6 @@ def iterate(train, val, test, batch_size):
         test_iter = data.BucketIterator(dataset=test,
                                         batch_size=batch_size,
                                         sort_key=lambda x: x.text.__len__(),
-                                        sort=True)
+                                        sort=True,
+                                        train=False)
         return train_iter, val_iter, test_iter
