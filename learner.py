@@ -88,6 +88,7 @@ class Learner:
                                 'val_loss': val_loss, 'val_f1': val_f1})
                         print('epoch {:02} - step {:06} - train_loss {:.4f} - val_loss {:.4f} - f1 {:.4f}'.format(
                             *list(info.values())))
+
                         if val_f1  >= max_f1:
                             self.save(info)
                             max_f1 = val_f1

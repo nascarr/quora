@@ -68,7 +68,7 @@ def analyze_args(args):
         # create smaller files for testing main function
         n_cut = 1000
         n_cut_emb = 10000
-        args.batch_size = n_cut/5
+        args.batch_size = n_cut/100
 
         if args.machine == 'kaggle':
             data_dir = '.'

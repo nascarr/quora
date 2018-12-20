@@ -14,14 +14,14 @@ class MyTabularDataset(TabularDataset):
             i = 0
             while i < k:
                 # val index
-                val_start_idx = cut_idxs[i]
-                val_end_idx = cut_idxs[i + 1]
+                val_start_idx = cut_idxs[(i+1)%k]
+                val_end_idx = cut_idxs[(i + 2)%k]
                 val_index = randperm[val_start_idx:val_end_idx]
 
                 # test index
                 if is_test:
-                    test_start_idx = cut_idxs[(i+1)%k]
-                    test_end_idx = cut_idxs[(i+2)%k]
+                    test_start_idx = cut_idxs[i]
+                    test_end_idx = cut_idxs[i + 1]
                     test_index = randperm[test_start_idx:test_end_idx]
                 else:
                     test_index = []
