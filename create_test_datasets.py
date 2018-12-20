@@ -75,15 +75,3 @@ def reduce_embedding(emb_path, new_dir, n):
             f.write(''.join(head))
     return small_emb_path
 
-
-if __name__ == '__main__':
-    directory = '../data'
-    train_csv = os.path.join(directory, 'train.csv')
-    test_csv = os.path.join(directory, 'test.csv')
-    n = 1000
-    n_emb = 10000
-    emb_dir = os.path.join(directory, 'embeddings')
-    emb_path = 'glove.840B.300d/glove.840B.300d.txt'
-
-    reduce_datasets([train_csv, test_csv], n)
-    reduce_embedding(emb_path, n_emb)
