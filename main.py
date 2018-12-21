@@ -23,7 +23,8 @@ def parse_script_args():
 
     # data preprocessing params
     arg('--kfold', '-k', type=int)
-    arg('--split_ratio', '-sr', nargs='+', default=0.8, type=float)
+    arg('--split_ratio', '-sr', nargs='+', default=[0.8], type=float)
+    arg('--test', action='store_true') # if present split data in train-val-test else split train-val
     arg('--seed', default=2018, type=int)
     arg('--tokenizer', '-t', default='spacy', choices=['spacy'])
     arg('--embedding', '-em', default='glove', choices=['glove', 'google_news', 'paragram', 'wiki_news'])
@@ -45,7 +46,6 @@ def parse_script_args():
     arg('--dropout', '-d', type=float, default=0.2)
 
     args = parser.parse_args()
-    print(args)
     return args
 
 
@@ -80,6 +80,10 @@ def analyze_args(args):
         if not check_changes_commited():
             sys.exit("Please commit all changes!")
 
+    # split ratio should be float if len == 1
+    sr = args.split_ratio
+    if len(sr) == 1:
+        args.split_ratio = sr[0]
     return train_csv, test_csv, emb_path, cache
 
 
@@ -90,13 +94,13 @@ def main(args, train_csv, test_csv, embedding, cache):
     random.seed(args.seed)
     k = args.kfold
     if k:
-        data_iter = train.split_kfold(k, is_test=True, random_state=random.getstate())
+        data_iter = train.split_kfold(k, is_test=args.test, random_state=random.getstate())
     else:
         data_iter = train.split(args.split_ratio, random_state=random.getstate())
 
     # iterate through folds
-    for d in data_iter:
-        print(len(d))
+    for fold, d in enumerate(data_iter):
+        print(f'========== Fold {fold} ==========')
         if len(d) == 2:
             train, val = d
         else:
@@ -122,12 +126,12 @@ def main(args, train_csv, test_csv, embedding, cache):
         learn.fit(args.epoch, eval_every, args.f1_tresh, args.early_stop, args.warmup_epoch)
 
         # predict test labels
-        learn.load()
-        test_label, _, test_ids, tresh = learn.predict_labels(is_test=True, tresh = args.f1_tresh)
-        if len(d) == 3:
-            test_loss_old, test_f1_old = learn.evaluate(learn.test_dl, args.f1_tresh)
-            print('Test results at point with best va lidation f1:', test_loss_old, test_f1_old)
-        learn.record()
+        learn.recorder.load()
+        test_label, _, test_ids, tresh = learn.predict_labels(is_test=True, tresh = [0.01, 0.5, 0.01])
+        if args.test:
+            test_loss, test_f1 = learn.evaluate(learn.test_dl, args.f1_tresh)
+            print('Test loss and f1:', test_loss, test_f1)
+        learn.recorder.record()
     test_ids = [qid.vocab.itos[i] for i in test_ids]
     submit(test_ids, test_label)
 

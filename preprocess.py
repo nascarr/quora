@@ -23,7 +23,6 @@ def preprocess(train_csv, test_csv, tokenizer, embeddings, cache):
         test = MyTabularDataset(path=test_csv, format='csv',
                                    fields={'qid': ('qid', qid),
                                            'question_text': ('text', text)})
-        print_duration(time_start, 'Time to read data?')
         text.build_vocab(train, test, min_freq=1)
         qid.build_vocab(train, test)
         print_duration(time_start, 'Time to read and tokenize data: ')

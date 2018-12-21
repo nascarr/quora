@@ -14,14 +14,18 @@ class MyTabularDataset(TabularDataset):
             i = 0
             while i < k:
                 # val index
-                val_start_idx = cut_idxs[(i+1)%k]
-                val_end_idx = cut_idxs[(i + 2)%k]
+                val_start_idx = cut_idxs[i]
+                val_end_idx = cut_idxs[i + 1]
                 val_index = randperm[val_start_idx:val_end_idx]
 
                 # test index
                 if is_test:
-                    test_start_idx = cut_idxs[i]
-                    test_end_idx = cut_idxs[i + 1]
+                    if i <= k - 2:
+                        test_start_idx = cut_idxs[i + 1]
+                        test_end_idx = cut_idxs[i + 2]
+                    else:
+                        test_start_idx = cut_idxs[0]
+                        test_end_idx = cut_idxs[1]
                     test_index = randperm[test_start_idx:test_end_idx]
                 else:
                     test_index = []
@@ -47,5 +51,6 @@ class MyTabularDataset(TabularDataset):
         randperm = rnd(range(N))
         fold_len = int(N/k)
         cut_idxs = [e * fold_len for e in list(range(k))] + [N]
+        print(cut_idxs)
         data_iter = _iter_folds()
         return data_iter

@@ -12,16 +12,14 @@ from utils import f1_metric, print_duration, get_hash, str_date_time, dict_to_cs
 
 class Learner:
 
-    models_dir = './models'
-    best_model_path = './models/best_model.m'
-    best_info_path = './models/best_model.info'
-    record_dir = './notes'
-
     def __init__(self, model, dataloaders, loss_func, optimizer, scheduler, args):
         self.model = model
         self.loss_func = loss_func
         self.optimizer = optimizer
         self.scheduler = scheduler
+        self.recorder = Recorder(args)
+        self.args = args
+
         if len(dataloaders) == 3:
             self.train_dl, self.val_dl, self.test_dl = dataloaders
         elif len(dataloaders) == 2:
@@ -30,18 +28,10 @@ class Learner:
         elif len(dataloaders) == 1:
             self.train_dl = dataloaders
             self.val_dl = self.test_dl = None
-        self.args = args
-        self.val_record = []
-        self.train_record = []
-        self.test_record = []
-        if self.args.mode == 'test':
-            self.record_path = './notes/test_records.csv'
-        elif self.args.mode == 'run':
-            self.record_path = './notes/records.csv'
+
 
     def fit(self, epoch, eval_every, tresh, early_stop=1, warmup_epoch=2):
-        print('Start training!')
-        time_start = time.time()
+
         step = 0
         max_f1 = 0
         max_test_f1 = 0
@@ -49,9 +39,10 @@ class Learner:
         no_improve_in_previous_epoch = False
         fine_tuning = False
         losses = []
-        torch.backends.cudnn.benchmark = True
         best_test_info = None
+        torch.backends.cudnn.benchmark = True
 
+        time_start = time.time()
         for e in range(epoch):
             self.scheduler.step()
             if e >= warmup_epoch:
@@ -75,53 +66,57 @@ class Learner:
                 y = train_batch.target.type(torch.Tensor).cuda()
                 pred = self.model.forward(x).view(-1)
                 loss = self.loss_func(pred, y)
-                self.train_record.append({'tr_loss': loss.cpu().data.numpy()})
+                self.recorder.tr_record.append({'tr_loss': loss.cpu().data.numpy()})
                 loss.backward()
                 self.optimizer.step()
-                with torch.no_grad():
-                    losses.append(loss.cpu().data.numpy())
-                    train_loss = np.mean(losses)
-                    if step % eval_every == 0:
+
+                if step % eval_every == 0:
+                    with torch.no_grad():
+                        # train evaluation
+                        losses.append(loss.cpu().data.numpy())
+                        train_loss = np.mean(losses)
+
+                        # val evaluation
                         val_loss, val_f1 = self.evaluate(self.val_dl, tresh)
-                        self.val_record.append({'step': step, 'loss': val_loss, 'f1': val_f1})
-                        info = self.format_info(info = {'best_ep': e, 'step': step, 'train_loss': train_loss,
+                        self.recorder.val_record.append({'step': step, 'loss': val_loss, 'f1': val_f1})
+                        info = self.recorder.format_info(info = {'best_ep': e, 'step': step, 'train_loss': train_loss,
                                 'val_loss': val_loss, 'val_f1': val_f1})
                         print('epoch {:02} - step {:06} - train_loss {:.4f} - val_loss {:.4f} - f1 {:.4f}'.format(
                             *list(info.values())))
 
                         if val_f1  >= max_f1:
-                            self.save(info)
+                            self.recorder.save(self.model, info)
                             max_f1 = val_f1
                             no_improve_in_previous_epoch = False
 
-                        """if 'target' in next(iter(self.test_dl)).fields:
+                        # test evaluation
+                        if self.args.test:
                             test_loss, test_f1 =  self.evaluate(self.test_dl, tresh)
                             test_info = {'test_ep': e, 'test_step': step, 'test_loss': test_loss, 'test_f1': test_f1}
-                            self.test_record.append({'step': step, 'loss': test_loss, 'f1': test_f1})
+                            self.recorder.test_record.append({'step': step, 'loss': test_loss, 'f1': test_f1})
                             print('epoch {:02} - step {:06} - test_loss {:.4f} - test_f1 {:.4f}'.format(*list(test_info.values())))
                             if test_f1 >= max_test_f1:
                                 max_test_f1 = test_f1
-                                best_test_info = test_info"""
-
-        """"if best_test_info:
-            self.append_info(best_test_info)
-            print('Best results for test:', best_test_info)"""
+                                best_test_info = test_info
 
         print_duration(time_start, 'Training time: ')
 
-        # calculate train loss and train f1_score
-        print('Evaluating model on train dataset')
-        train_loss, train_f1 = self.evaluate(self.train_dl, tresh)
-        tr_info = self.format_info({'train_loss':train_loss, 'train_f1':train_f1})
-        print(tr_info)
-        self.append_info(tr_info)
+        if self.args.test:
+            self.recorder.append_info(best_test_info, message='Best results for test:')
 
-        m_info = self.load()
-        print(f'Best model: {m_info}')
+        self.model, info = self.recorder.load(message = 'Best model:')
+
+        # final train evaluation
+        train_loss, train_f1 = self.evaluate(self.train_dl, tresh)
+        tr_info = {'train_loss':train_loss, 'train_f1':train_f1}
+        self.recorder.append_info(tr_info, message='Train loss and f1:')
+
+
 
     def evaluate(self, dl, tresh):
         with torch.no_grad():
             dl.init_epoch()
+            self.model.lstm.flatten_parameters()
             self.model.eval()
             self.model.zero_grad()
             loss = []
@@ -167,7 +162,6 @@ class Learner:
 
     def predict_labels(self, is_test=False, tresh=0.5):
         def _choose_tr(self, min_tr, max_tr, tr_step):
-            print('Choosing treshold.\n')
             val_pred, val_true, _ = self.predict_probs(is_test=False)
             tmp = [0, 0, 0]  # idx, current_f1, max_f1
             tr = min_tr
@@ -185,16 +179,31 @@ class Learner:
 
         if type(tresh) == list:
             tresh, max_f1 = _choose_tr(self, *tresh)
-            self.append_info({'best_tr': tresh, 'best_f1': max_f1})
+            self.recorder.append_info({'best_tr': tresh, 'best_f1': max_f1})
 
         y_label = (np.array(y_pred) >= tresh).astype(int)
         return y_label, y_true, ids, tresh
 
-    def save(self, info):
-        os.makedirs(self.models_dir, exist_ok=True)
-        if self.args.mode == 'run':
-            torch.save(self.model, self.best_model_path)
-        torch.save(info, self.best_info_path)
+
+
+
+
+class Recorder:
+
+    models_dir = './models'
+    best_model_path = './models/best_model.m'
+    best_info_path = './models/best_model.info'
+    record_dir = './notes'
+
+    def __init__(self, args):
+        self.args = args
+        if self.args.mode == 'test':
+            self.record_path = './notes/test_records.csv'
+        elif self.args.mode == 'run':
+            self.record_path = './notes/records.csv'
+        self.val_record = []
+        self.tr_record = []
+        self.test_record = []
 
     @staticmethod
     def format_info(info):
@@ -205,18 +214,32 @@ class Learner:
         return info
 
     @classmethod
-    def append_info(cls, dict):
+    def append_info(cls, dict, message=None):
         dict = cls.format_info(dict)
+        if message:
+            print(message, dict)
         info = torch.load(cls.best_info_path)
         info.update(dict)
         torch.save(info, cls.best_info_path)
 
+    def save(self, model, info):
+        os.makedirs(self.models_dir, exist_ok=True)
+        torch.save(model, self.best_model_path)
+        torch.save(info, self.best_info_path)
+
+    def load(self, message=None):
+        model = torch.load(self.best_model_path)
+        info = torch.load(self.best_info_path)
+        if message:
+            print(message, info)
+        return model, info
+
     def record(self):
         # save plots
-        save_plot(self.val_record, 'loss', self.args.n_eval)
-        save_plot(self.val_record, 'f1', self.args.n_eval)
-        save_plot(self.train_record, 'tr_loss', self.args.n_eval)
-        save_plots([self.val_record, self.test_record], ['loss', 'f1'], ['val', 'test'],self.args.n_eval)
+        save_plot(self.val_record, 'loss', self.args.n_eval, 'val_loss')
+        save_plot(self.val_record, 'f1', self.args.n_eval, 'val_f1')
+        if self.args.test:
+            save_plots([self.val_record, self.test_record], ['loss', 'f1'], ['val', 'test'],self.args.n_eval)
 
         # create subdir for this experiment
         os.makedirs(self.record_dir, exist_ok=True)
@@ -239,8 +262,3 @@ class Learner:
 
         # copy all records to subdir
         copy_files(['*.png', 'models/*.m', 'models/*.info'], subdir)
-
-    def load(self):
-        self.model = torch.load(self.best_model_path)
-        info = torch.load(self.best_info_path)
-        return info

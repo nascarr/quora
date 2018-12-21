@@ -68,15 +68,15 @@ def check_changes_commited():
     return status
 
 
-def save_plot(record, key,n_eval):
+def save_plot(record, key, n_eval, fname):
     y = [o[key] for o in record]
     x = np.array(range(len(y))) / n_eval
     fig, ax = plt.subplots(1, 1)
     ax.plot(x, y)
     ax.set_xlabel('epoch')
     ax.set_ylabel(key)
-    fname = key + '.png'
     fig.savefig(fname)
+
 
 def save_plots(records, keys, labels, n_eval):
     for k in keys:
@@ -91,6 +91,7 @@ def save_plots(records, keys, labels, n_eval):
         fname = k + '.png'
         fig.savefig(fname)
         plt.close()
+
 
 def copy_files(arg_list, dest_dir):
     for a in arg_list:
