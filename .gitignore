@@ -2,6 +2,7 @@
 *.txt
 !requirements.txt
 *.csv
+*.csv#
 *.ods
 *.m
 *.info
