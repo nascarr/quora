@@ -116,7 +116,7 @@ class Learner:
     def evaluate(self, dl, tresh):
         with torch.no_grad():
             dl.init_epoch()
-            self.model.lstm.flatten_parameters()
+            self.model.cell.flatten_parameters()
             self.model.eval()
             self.model.zero_grad()
             loss = []
@@ -145,7 +145,7 @@ class Learner:
             print('Predicting validation dataset...')
             dl = self.val_dl
 
-        self.model.lstm.flatten_parameters()
+        self.model.cell.flatten_parameters()
         self.model.eval()
         y_pred = []
         y_true = []
