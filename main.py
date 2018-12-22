@@ -33,6 +33,7 @@ def parse_script_args():
     arg('--optim', '-o', default='Adam', choices=['Adam', 'AdamW'])
     arg('--epoch', '-e', default=7, type=int)
     arg('--lr', '-lr', default=1e-3, type=float)
+    arg('--lrstep', default=[3], nargs='+', type=int) # steps when lr multiplied by 0.1
     arg('--batch_size', '-bs', default=512, type=int)
     arg('--n_eval', '-ne', default=1, type=int, help='Number of validation set evaluations during 1 epoch')
     arg('--warmup_epoch', '-we', default=2, type=int, help='Number of epochs without fine tuning')
@@ -140,7 +141,7 @@ def main(args, train_csv, test_csv, embedding, cache):
             optimizer = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=args.lr)
         elif args.optim == 'AdamW':
             optimizer = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=args.lr, betas=(0.9, 0.99))
-        scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=[3], gamma=0.1)
+        scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=args.lrstep, gamma=0.1)
         loss_function = nn.BCEWithLogitsLoss()
         learn = Learner(model, dataloaders, loss_function, optimizer, scheduler, args)
         learn.fit(args.epoch, eval_every, args.f1_tresh, args.early_stop, args.warmup_epoch)
