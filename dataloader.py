@@ -51,6 +51,5 @@ class MyTabularDataset(TabularDataset):
         randperm = rnd(range(N))
         fold_len = int(N/k)
         cut_idxs = [e * fold_len for e in list(range(k))] + [N]
-        print(cut_idxs)
         data_iter = _iter_folds()
         return data_iter

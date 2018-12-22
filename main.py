@@ -38,7 +38,7 @@ def parse_script_args():
     arg('--n_eval', '-ne', default=1, type=int, help='Number of validation set evaluations during 1 epoch')
     arg('--warmup_epoch', '-we', default=2, type=int, help='Number of epochs without fine tuning')
     arg('--early_stop', '-es', default=1, type=int, help='Stop training if no improvement during this number of epochs')
-    arg('--f1_tresh', '-ft', default=0.33, type=float)
+    arg('--f1_tresh', '-ft', default=0.335, type=float)
 
     # model params
     arg('--model', '-m', default='BiLSTM', choices=['BiLSTM', 'BiGRU', 'BiLSTMPool', 'BiLSTM_2FC'])
