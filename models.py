@@ -53,7 +53,7 @@ class BiGRU(nn.Module):
 
 class BiLSTMPool(nn.Module):
     def __init__(self, pretrained_lm, padding_idx, static=True, hidden_dim=100, lstm_layer=2, dropout=0.2):
-        super(BiLSTM, self).__init__()
+        super(BiLSTMPool, self).__init__()
         self.hidden_dim = hidden_dim
         self.dropout = nn.Dropout(p=dropout)
         self.embedding = nn.Embedding.from_pretrained(pretrained_lm)
@@ -65,7 +65,6 @@ class BiLSTMPool(nn.Module):
                             num_layers=lstm_layer,
                             dropout=dropout,
                             bidirectional=True)
-        self.pool =
         self.hidden2label = nn.Linear(hidden_dim * 6, 1)
         self.cell = self.lstm
 
@@ -73,5 +72,10 @@ class BiLSTMPool(nn.Module):
         x = self.embedding(sents)
         x = torch.transpose(x, dim0=1, dim1=0)
         lstm_out, (h_n, c_n) = self.lstm(x)
-        y = self.hidden2label(self.dropout(torch.cat([h_n[i, :, :] for i in range(h_n.shape[0])], dim=1)))
+        sl, bs, _ = lstm_out.shape
+        lstm_out = lstm_out.view(sl, bs, 2 * self.hidden_dim)
+        output = lstm_out[-1]
+        max_pool, _ = torch.max(lstm_out, 0)
+        average_pool = torch.mean(lstm_out, 0)
+        y = self.hidden2label(self.dropout(torch.cat((max_pool, average_pool, output), dim=1)))
         return y
