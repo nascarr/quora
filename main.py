@@ -157,7 +157,7 @@ def main(args, train_csv, test_csv, embedding, cache):
         if args.test:
             test_loss, test_f1 = learn.evaluate(learn.test_dl, args.f1_tresh)
             print('Test loss and f1:', test_loss, test_f1)
-        learn.recorder.record()
+        learn.recorder.record(fold)
     test_ids = [qid.vocab.itos[i] for i in test_ids]
     submit(test_ids, test_label)
 

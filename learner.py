@@ -79,11 +79,9 @@ class Learner:
                         # val evaluation
                         val_loss, val_f1 = self.evaluate(self.val_dl, tresh)
                         self.recorder.val_record.append({'step': step, 'loss': val_loss, 'f1': val_f1})
-                        info = self.recorder.format_info(info = {'best_ep': e, 'step': step, 'train_loss': train_loss,
-                                'val_loss': val_loss, 'val_f1': val_f1})
-                        print('epoch {:02} - step {:06} - train_loss {:.4f} - val_loss {:.4f} - f1 {:.4f}'.format(
-                            *list(info.values())))
-
+                        info = {'best_ep': e, 'step': step, 'train_loss': train_loss,
+                                'val_loss': val_loss, 'val_f1': val_f1}
+                        self.recorder.save_step(info, message=True)
                         if val_f1  >= max_f1:
                             self.recorder.save(self.model, info)
                             max_f1 = val_f1
@@ -204,6 +202,7 @@ class Recorder:
         self.val_record = []
         self.tr_record = []
         self.test_record = []
+        self.new = True
 
     @staticmethod
     def format_info(info):
@@ -225,6 +224,7 @@ class Recorder:
     def save(self, model, info):
         os.makedirs(self.models_dir, exist_ok=True)
         torch.save(model, self.best_model_path)
+        info = self.format_info(info)
         torch.save(info, self.best_info_path)
 
     def load(self, message=None):
@@ -234,7 +234,20 @@ class Recorder:
             print(message, info)
         return model, info
 
-    def record(self):
+    def save_step(self, step_info, message = False):
+        if self.new:
+            header = True
+            mode = 'w'
+            self.new = False
+        else:
+            header=False
+            mode = 'a'
+        dict_to_csv(step_info, 'steps.csv', mode, orient='columns', header=header)
+        if message:
+            print('epoch {:02} - step {:06} - train_loss {:.4f} - val_loss {:.4f} - f1 {:.4f}'.format(
+                *list(step_info.values())))
+
+    def record(self, fold):
         # save plots
         save_plot(self.val_record, 'loss', self.args.n_eval, 'val_loss')
         save_plot(self.val_record, 'f1', self.args.n_eval, 'val_f1')
@@ -258,7 +271,8 @@ class Recorder:
         passed_args = ' '.join(sys.argv[1:])
         param_dict = {'hash':hash, 'subdir':subdir, **param_dict, **info, 'args': passed_args}
         dict_to_csv(param_dict, csvlog, 'w', 'index', reverse=False)
-        dict_to_csv(param_dict, self.record_path, 'a', 'columns', reverse=True)
+        header = True if fold == 0 else False
+        dict_to_csv(param_dict, self.record_path, 'a', 'columns', reverse=True, header=header)
 
         # copy all records to subdir
         copy_files(['*.png', 'models/*.m', 'models/*.info'], subdir)

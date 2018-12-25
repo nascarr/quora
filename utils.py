@@ -45,7 +45,7 @@ def str_date_time():
     return date_time
 
 
-def dict_to_csv(dict, csvname, mode, orient, reverse):
+def dict_to_csv(dict, csvname, mode, orient, reverse=False, header=True):
     if orient == 'index':
         df = pd.DataFrame.from_dict(dict, orient='index')
         df.to_csv(csvname, header=False, mode=mode)
@@ -53,7 +53,7 @@ def dict_to_csv(dict, csvname, mode, orient, reverse):
         df = pd.DataFrame(dict, index=[0])
         if reverse: #reverse dataframe columnes
             df = df.iloc[:, ::-1]
-        df.to_csv(csvname, index=False, mode=mode)
+        df.to_csv(csvname, index=False, mode=mode, header=header)
     # TODO: append rows considering columns names
 
 
