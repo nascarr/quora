@@ -97,7 +97,8 @@ class Learner:
                                 max_test_f1 = test_f1
                                 best_test_info = test_info
 
-        print_duration(time_start, 'Training time: ')
+        tr_time = print_duration(time_start, 'Training time: ')
+        self.recorder.append_info({'ep_time': tr_time/(e + 1)})
 
         if self.args.test:
             self.recorder.append_info(best_test_info, message='Best results for test:')

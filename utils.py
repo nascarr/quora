@@ -31,6 +31,8 @@ def print_duration(time_start, message):
     seconds = int(time_end - time_start)
     tr_time = timedelta(seconds=seconds)
     print(f'{message}{tr_time}')
+    minutes = seconds/60
+    return minutes
 
 
 def get_hash():
