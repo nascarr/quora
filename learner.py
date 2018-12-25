@@ -276,4 +276,4 @@ class Recorder:
         dict_to_csv(param_dict, self.record_path, 'a', 'columns', reverse=True, header=header)
 
         # copy all records to subdir
-        copy_files(['*.png', 'models/*.m', 'models/*.info'], subdir)
+        copy_files(['*.png', 'models/*.info'], subdir)
