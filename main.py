@@ -41,7 +41,7 @@ def parse_script_args():
     arg('--f1_tresh', '-ft', default=0.335, type=float)
 
     # model params
-    arg('--model', '-m', default='BiLSTM', choices=['BiLSTM', 'BiGRU', 'BiLSTMPool', 'BiLSTM_2FC', 'BiGRUPool', 'BiGRUPool_2FC'])
+    arg('--model', '-m', default='BiLSTM', choices=['BiLSTM', 'BiGRU', 'BiLSTMPool', 'BiLSTM_2FC', 'BiGRUPool', 'BiGRUPool_2FC', 'BiLSTMPool_2FC'])
     arg('--n_layers', '-n', default=2, type=int, help='Number of layers in model')
     arg('--hidden_dim', '-hd', type=int, default=100)
     arg('--dropout', '-d', type=float, default=0.2)
@@ -144,6 +144,13 @@ def main(args, train_csv, test_csv, embedding, cache):
 
         if args.model == 'BiGRUPool_2FC':
             model = BiGRUPool_2FC(text.vocab.vectors,
+                               lstm_layer=args.n_layers,
+                               padding_idx=text.vocab.stoi[text.pad_token],
+                               hidden_dim=args.hidden_dim,
+                               dropout=args.dropout).cuda()
+
+        if args.model == 'BiLSTMPool_2FC':
+            model = BiLSTMPool_2FC(text.vocab.vectors,
                                lstm_layer=args.n_layers,
                                padding_idx=text.vocab.stoi[text.pad_token],
                                hidden_dim=args.hidden_dim,
