@@ -33,6 +33,7 @@ class Learner:
     def fit(self, epoch, eval_every, tresh, early_stop=1, warmup_epoch=2):
 
         step = 0
+        min_loss = 1e5
         max_f1 = 0
         max_test_f1 = 0
         no_improve_epoch = 0
@@ -86,6 +87,8 @@ class Learner:
                             self.recorder.save(self.model, info)
                             max_f1 = val_f1
                             no_improve_in_previous_epoch = False
+                        if val_loss < min_loss:
+                            min_loss = val_loss
 
                         # test evaluation
                         if self.args.test:
@@ -102,6 +105,7 @@ class Learner:
 
         if self.args.test:
             self.recorder.append_info(best_test_info, message='Best results for test:')
+        self.recorder.append_info({'min_loss': min_loss}, 'Min val loss: ')
 
         self.model, info = self.recorder.load(message = 'Best model:')
 
@@ -276,4 +280,4 @@ class Recorder:
         dict_to_csv(param_dict, self.record_path, 'a', 'columns', reverse=True, header=header)
 
         # copy all records to subdir
-        copy_files(['*.png', 'models/*.info'], subdir)
+        copy_files(['*.png', 'models/*.info', 'steps.csv'], subdir)
