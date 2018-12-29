@@ -70,7 +70,8 @@ class Learner:
                 loss = self.loss_func(pred, y)
                 self.recorder.tr_record.append({'tr_loss': loss.cpu().data.numpy()})
                 loss.backward()
-                nn.utils.clip_grad_norm(self.model.parameters(), clip)
+                total_norm = nn.utils.clip_grad_norm_(self.model.parameters(), clip)
+                print(total_norm)
                 self.optimizer.step()
 
                 if step % eval_every == 0:
