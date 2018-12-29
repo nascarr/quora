@@ -39,6 +39,7 @@ def parse_script_args():
     arg('--warmup_epoch', '-we', default=2, type=int, help='Number of epochs without fine tuning')
     arg('--early_stop', '-es', default=1, type=int, help='Stop training if no improvement during this number of epochs')
     arg('--f1_tresh', '-ft', default=0.335, type=float)
+    arg('--clip', type=float, default=0.5, help='gradient clipping')
 
     # model params
     arg('--model', '-m', default='BiLSTM', choices=['BiLSTM', 'BiGRU', 'BiLSTMPool', 'BiLSTM_2FC', 'BiGRUPool', 'BiGRUPool_2FC', 'BiLSTMPool_2FC'])
@@ -163,7 +164,7 @@ def main(args, train_csv, test_csv, embedding, cache):
         scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=args.lrstep, gamma=0.1)
         loss_function = nn.BCEWithLogitsLoss()
         learn = Learner(model, dataloaders, loss_function, optimizer, scheduler, args)
-        learn.fit(args.epoch, eval_every, args.f1_tresh, args.early_stop, args.warmup_epoch)
+        learn.fit(args.epoch, eval_every, args.f1_tresh, args.early_stop, args.warmup_epoch, args.clip)
 
         # predict test labels
         learn.recorder.load()

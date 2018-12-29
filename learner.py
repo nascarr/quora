@@ -1,5 +1,6 @@
 import numpy as np
 import torch
+import torch.nn as nn
 import os
 from sklearn.metrics import f1_score
 import warnings
@@ -30,7 +31,7 @@ class Learner:
             self.val_dl = self.test_dl = None
 
 
-    def fit(self, epoch, eval_every, tresh, early_stop=1, warmup_epoch=2):
+    def fit(self, epoch, eval_every, tresh, early_stop, warmup_epoch, clip):
 
         step = 0
         min_loss = 1e5
@@ -69,6 +70,7 @@ class Learner:
                 loss = self.loss_func(pred, y)
                 self.recorder.tr_record.append({'tr_loss': loss.cpu().data.numpy()})
                 loss.backward()
+                nn.utils.clip_grad_norm(self.model.parameters(), clip)
                 self.optimizer.step()
 
                 if step % eval_every == 0:
