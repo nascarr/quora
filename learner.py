@@ -71,7 +71,14 @@ class Learner:
                 self.recorder.tr_record.append({'tr_loss': loss.cpu().data.numpy()})
                 loss.backward()
                 total_norm = nn.utils.clip_grad_norm_(self.model.parameters(), clip)
-                print(total_norm)
+                parameters = list(filter(lambda p: p.grad is not None, self.model.parameters()))
+                # total_norm = 0
+                # for p in parameters:
+                #     param_norm = p.grad.data.norm(2)
+                #     total_norm += param_norm.item() ** 2
+                # total_norm = total_norm ** (1. / 2)
+
+                self.recorder.norm_record.append({'grad_norm': total_norm})
                 self.optimizer.step()
 
                 if step % eval_every == 0:
@@ -210,6 +217,7 @@ class Recorder:
         self.val_record = []
         self.tr_record = []
         self.test_record = []
+        self.norm_record = []
         self.new = True
 
     @staticmethod
@@ -259,6 +267,7 @@ class Recorder:
         # save plots
         save_plot(self.val_record, 'loss', self.args.n_eval, 'val_loss')
         save_plot(self.val_record, 'f1', self.args.n_eval, 'val_f1')
+        save_plot(self.norm_record, 'grad_norm', self.args.n_eval, 'grad_norm')
         if self.args.test:
             save_plots([self.val_record, self.test_record], ['loss', 'f1'], ['val', 'test'],self.args.n_eval)
 
