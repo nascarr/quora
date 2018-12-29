@@ -107,18 +107,6 @@ def reduce_embedding(emb_path, new_dir, n):
     return small_emb_path
 
 
-if __name__ == '__main__':
-    directory = '../data'
-    train_csv = os.path.join(directory, 'train.csv')
-    test_csv = os.path.join(directory, 'test.csv')
-    n = 1000
-    n_emb = 10000
-    emb_dir = os.path.join(directory, 'embeddings')
-    emb_path = 'glove.840B.300d/glove.840B.300d.txt'
-
-    reduce_datasets([train_csv, test_csv], n)
-    reduce_embedding(emb_path, n_emb)
-
 def submit(test_ids, prediciton, subm_name='submission.csv'):
     sub_df = pd.DataFrame()
     sub_df['qid'] = test_ids
@@ -143,6 +131,8 @@ def print_duration(time_start, message):
     seconds = int(time_end - time_start)
     tr_time = timedelta(seconds=seconds)
     print(f'{message}{tr_time}')
+    minutes = seconds/60
+    return minutes
 
 
 def get_hash():
@@ -157,7 +147,7 @@ def str_date_time():
     return date_time
 
 
-def dict_to_csv(dict, csvname, mode, orient, reverse):
+def dict_to_csv(dict, csvname, mode, orient, reverse=False, header=True):
     if orient == 'index':
         df = pd.DataFrame.from_dict(dict, orient='index')
         df.to_csv(csvname, header=False, mode=mode)
@@ -165,7 +155,7 @@ def dict_to_csv(dict, csvname, mode, orient, reverse):
         df = pd.DataFrame(dict, index=[0])
         if reverse: #reverse dataframe columnes
             df = df.iloc[:, ::-1]
-        df.to_csv(csvname, index=False, mode=mode)
+        df.to_csv(csvname, index=False, mode=mode, header=header)
     # TODO: append rows considering columns names
 
 
@@ -180,15 +170,15 @@ def check_changes_commited():
     return status
 
 
-def save_plot(record, key,n_eval):
+def save_plot(record, key, n_eval, fname):
     y = [o[key] for o in record]
     x = np.array(range(len(y))) / n_eval
     fig, ax = plt.subplots(1, 1)
     ax.plot(x, y)
     ax.set_xlabel('epoch')
     ax.set_ylabel(key)
-    fname = key + '.png'
     fig.savefig(fname)
+
 
 def save_plots(records, keys, labels, n_eval):
     for k in keys:
@@ -203,6 +193,7 @@ def save_plots(records, keys, labels, n_eval):
         fname = k + '.png'
         fig.savefig(fname)
         plt.close()
+
 
 def copy_files(arg_list, dest_dir):
     for a in arg_list:
@@ -222,14 +213,18 @@ class MyTabularDataset(TabularDataset):
             i = 0
             while i < k:
                 # val index
-                val_start_idx = cut_idxs[(i+1)%k]
-                val_end_idx = cut_idxs[(i + 2)%k]
+                val_start_idx = cut_idxs[i]
+                val_end_idx = cut_idxs[i + 1]
                 val_index = randperm[val_start_idx:val_end_idx]
 
                 # test index
                 if is_test:
-                    test_start_idx = cut_idxs[i]
-                    test_end_idx = cut_idxs[i + 1]
+                    if i <= k - 2:
+                        test_start_idx = cut_idxs[i + 1]
+                        test_end_idx = cut_idxs[i + 2]
+                    else:
+                        test_start_idx = cut_idxs[0]
+                        test_end_idx = cut_idxs[1]
                     test_index = randperm[test_start_idx:test_end_idx]
                 else:
                     test_index = []
@@ -277,7 +272,6 @@ def preprocess(train_csv, test_csv, tokenizer, embeddings, cache):
         test = MyTabularDataset(path=test_csv, format='csv',
                                    fields={'qid': ('qid', qid),
                                            'question_text': ('text', text)})
-        print_duration(time_start, 'Time to read data?')
         text.build_vocab(train, test, min_freq=1)
         qid.build_vocab(train, test)
         print_duration(time_start, 'Time to read and tokenize data: ')
@@ -328,6 +322,7 @@ class BiLSTM(nn.Module):
                             dropout=dropout,
                             bidirectional=True)
         self.hidden2label = nn.Linear(hidden_dim * lstm_layer * 2, 1)
+        self.cell = self.lstm
 
     def forward(self, sents):
         x = self.embedding(sents)
@@ -336,18 +331,189 @@ class BiLSTM(nn.Module):
         y = self.hidden2label(self.dropout(torch.cat([h_n[i, :, :] for i in range(h_n.shape[0])], dim=1)))
         return y
 
-class Learner:
 
-    models_dir = './models'
-    best_model_path = './models/best_model.m'
-    best_info_path = './models/best_model.info'
-    record_dir = './notes'
+class BiGRU(nn.Module):
+    def __init__(self, pretrained_lm, padding_idx, static=True, hidden_dim=100, lstm_layer=2, dropout=0.2):
+        super(BiGRU, self).__init__()
+        self.hidden_dim = hidden_dim
+        self.dropout = nn.Dropout(p=dropout)
+        self.embedding = nn.Embedding.from_pretrained(pretrained_lm)
+        self.embedding.padding_idx = padding_idx
+        if static:
+            self.embedding.weight.requires_grad = False
+        self.gru = nn.GRU(input_size=self.embedding.embedding_dim,
+                          hidden_size=hidden_dim,
+                          num_layers=lstm_layer,
+                          dropout=dropout,
+                          bidirectional=True)
+        self.hidden2label = nn.Linear(hidden_dim * lstm_layer * 2, 1)
+        self.cell = self.gru
+
+    def forward(self, sents):
+        x = self.embedding(sents)
+        x = torch.transpose(x, dim0=1, dim1=0)
+        gru_out, h_n = self.gru(x)
+        y = self.hidden2label(self.dropout(torch.cat([h_n[i, :, :] for i in range(h_n.shape[0])], dim=1)))
+        return y
+
+class BiLSTMPool(nn.Module):
+    def __init__(self, pretrained_lm, padding_idx, static=True, hidden_dim=100, lstm_layer=2, dropout=0.2):
+        super(BiLSTMPool, self).__init__()
+        self.hidden_dim = hidden_dim
+        self.dropout = nn.Dropout(p=dropout)
+        self.embedding = nn.Embedding.from_pretrained(pretrained_lm)
+        self.embedding.padding_idx = padding_idx
+        if static:
+            self.embedding.weight.requires_grad = False
+        self.lstm = nn.LSTM(input_size=self.embedding.embedding_dim,
+                            hidden_size=hidden_dim,
+                            num_layers=lstm_layer,
+                            dropout=dropout,
+                            bidirectional=True)
+        self.hidden2label = nn.Linear(hidden_dim * 6, 1)
+        self.cell = self.lstm
+
+    def forward(self, sents):
+        x = self.embedding(sents)
+        x = torch.transpose(x, dim0=1, dim1=0)
+        lstm_out, (h_n, c_n) = self.lstm(x)
+        sl, bs, _ = lstm_out.shape
+        lstm_out = lstm_out.view(sl, bs, 2 * self.hidden_dim)
+        output = lstm_out[-1]
+        max_pool, _ = torch.max(lstm_out, 0)
+        average_pool = torch.mean(lstm_out, 0)
+        y = self.hidden2label(self.dropout(torch.cat((max_pool, average_pool, output), dim=1)))
+        return y
+
+
+class BiLSTM_2FC(nn.Module):
+    def __init__(self, pretrained_lm, padding_idx, static=True, hidden_dim=100, lstm_layer=2, dropout=0.2):
+        super(BiLSTM_2FC, self).__init__()
+        self.hidden_dim = hidden_dim
+        self.dropout = nn.Dropout(p=dropout)
+        self.embedding = nn.Embedding.from_pretrained(pretrained_lm)
+        self.embedding.padding_idx = padding_idx
+        if static:
+            self.embedding.weight.requires_grad = False
+        self.lstm = nn.LSTM(input_size=self.embedding.embedding_dim,
+                            hidden_size=hidden_dim,
+                            num_layers=lstm_layer,
+                            dropout=dropout,
+                            bidirectional=True)
+        self.fc1 = nn.Linear(hidden_dim * lstm_layer * 2, hidden_dim)
+        self.fc2 = nn.Linear(hidden_dim, 1)
+        self.cell = self.lstm
+
+    def forward(self, sents):
+        x = self.embedding(sents)
+        x = torch.transpose(x, dim0=1, dim1=0)
+        lstm_out, (h_n, c_n) = self.lstm(x)
+        y = self.fc1(self.dropout(torch.cat([h_n[i, :, :] for i in range(h_n.shape[0])], dim=1)))
+        y = self.fc2(self.dropout(y))
+        return y
+
+class BiGRUPool(nn.Module):
+    def __init__(self, pretrained_lm, padding_idx, static=True, hidden_dim=100, lstm_layer=2, dropout=0.2):
+        super(BiGRUPool, self).__init__()
+        self.hidden_dim = hidden_dim
+        self.dropout = nn.Dropout(p=dropout)
+        self.embedding = nn.Embedding.from_pretrained(pretrained_lm)
+        self.embedding.padding_idx = padding_idx
+        if static:
+            self.embedding.weight.requires_grad = False
+        self.gru = nn.GRU(input_size=self.embedding.embedding_dim,
+                            hidden_size=hidden_dim,
+                            num_layers=lstm_layer,
+                            dropout=dropout,
+                            bidirectional=True)
+        self.hidden2label = nn.Linear(hidden_dim * 6, 1)
+        self.cell = self.gru
+
+    def forward(self, sents):
+        x = self.embedding(sents)
+        x = torch.transpose(x, dim0=1, dim1=0)
+        lstm_out, _ = self.gru(x)
+        sl, bs, _ = lstm_out.shape
+        lstm_out = lstm_out.view(sl, bs, 2 * self.hidden_dim)
+        output = lstm_out[-1]
+        max_pool, _ = torch.max(lstm_out, 0)
+        average_pool = torch.mean(lstm_out, 0)
+        y = self.hidden2label(self.dropout(torch.cat((max_pool, average_pool, output), dim=1)))
+        return y
+
+
+class BiGRUPool_2FC(nn.Module):
+    def __init__(self, pretrained_lm, padding_idx, static=True, hidden_dim=100, lstm_layer=2, dropout=0.2):
+        super(BiGRUPool_2FC, self).__init__()
+        self.hidden_dim = hidden_dim
+        self.dropout = nn.Dropout(p=dropout)
+        self.embedding = nn.Embedding.from_pretrained(pretrained_lm)
+        self.embedding.padding_idx = padding_idx
+        if static:
+            self.embedding.weight.requires_grad = False
+        self.gru = nn.GRU(input_size=self.embedding.embedding_dim,
+                            hidden_size=hidden_dim,
+                            num_layers=lstm_layer,
+                            dropout=dropout,
+                            bidirectional=True)
+        self.fc1 = nn.Linear(hidden_dim * 6, hidden_dim)
+        self.fc2 = nn.Linear(hidden_dim, 1)
+        self.cell = self.gru
+
+    def forward(self, sents):
+        x = self.embedding(sents)
+        x = torch.transpose(x, dim0=1, dim1=0)
+        lstm_out, _ = self.gru(x)
+        sl, bs, _ = lstm_out.shape
+        lstm_out = lstm_out.view(sl, bs, 2 * self.hidden_dim)
+        output = lstm_out[-1]
+        max_pool, _ = torch.max(lstm_out, 0)
+        average_pool = torch.mean(lstm_out, 0)
+        y = self.fc1(self.dropout(torch.cat((max_pool, average_pool, output), dim=1)))
+        y = self.fc2(self.dropout(y))
+        return y
+
+class BiLSTMPool_2FC(nn.Module):
+    def __init__(self, pretrained_lm, padding_idx, static=True, hidden_dim=100, lstm_layer=2, dropout=0.2):
+        super(BiLSTMPool_2FC, self).__init__()
+        self.hidden_dim = hidden_dim
+        self.dropout = nn.Dropout(p=dropout)
+        self.embedding = nn.Embedding.from_pretrained(pretrained_lm)
+        self.embedding.padding_idx = padding_idx
+        if static:
+            self.embedding.weight.requires_grad = False
+        self.gru = nn.LSTM(input_size=self.embedding.embedding_dim,
+                            hidden_size=hidden_dim,
+                            num_layers=lstm_layer,
+                            dropout=dropout,
+                            bidirectional=True)
+        self.fc1 = nn.Linear(hidden_dim * 6, hidden_dim)
+        self.fc2 = nn.Linear(hidden_dim, 1)
+        self.cell = self.lstm
+
+    def forward(self, sents):
+        x = self.embedding(sents)
+        x = torch.transpose(x, dim0=1, dim1=0)
+        lstm_out, _, _ = self.lstm(x)
+        sl, bs, _ = lstm_out.shape
+        lstm_out = lstm_out.view(sl, bs, 2 * self.hidden_dim)
+        output = lstm_out[-1]
+        max_pool, _ = torch.max(lstm_out, 0)
+        average_pool = torch.mean(lstm_out, 0)
+        y = self.fc1(self.dropout(torch.cat((max_pool, average_pool, output), dim=1)))
+        y = self.fc2(self.dropout(y))
+        return y
+
+class Learner:
 
     def __init__(self, model, dataloaders, loss_func, optimizer, scheduler, args):
         self.model = model
         self.loss_func = loss_func
         self.optimizer = optimizer
         self.scheduler = scheduler
+        self.recorder = Recorder(args)
+        self.args = args
+
         if len(dataloaders) == 3:
             self.train_dl, self.val_dl, self.test_dl = dataloaders
         elif len(dataloaders) == 2:
@@ -356,28 +522,22 @@ class Learner:
         elif len(dataloaders) == 1:
             self.train_dl = dataloaders
             self.val_dl = self.test_dl = None
-        self.args = args
-        self.val_record = []
-        self.train_record = []
-        self.test_record = []
-        if self.args.mode == 'test':
-            self.record_path = './notes/test_records.csv'
-        elif self.args.mode == 'run':
-            self.record_path = './notes/records.csv'
+
 
     def fit(self, epoch, eval_every, tresh, early_stop=1, warmup_epoch=2):
-        print('Start training!')
-        time_start = time.time()
+
         step = 0
+        min_loss = 1e5
         max_f1 = 0
         max_test_f1 = 0
         no_improve_epoch = 0
         no_improve_in_previous_epoch = False
         fine_tuning = False
         losses = []
-        torch.backends.cudnn.benchmark = True
         best_test_info = None
+        torch.backends.cudnn.benchmark = True
 
+        time_start = time.time()
         for e in range(epoch):
             self.scheduler.step()
             if e >= warmup_epoch:
@@ -401,53 +561,59 @@ class Learner:
                 y = train_batch.target.type(torch.Tensor).cuda()
                 pred = self.model.forward(x).view(-1)
                 loss = self.loss_func(pred, y)
-                self.train_record.append({'tr_loss': loss.cpu().data.numpy()})
+                self.recorder.tr_record.append({'tr_loss': loss.cpu().data.numpy()})
                 loss.backward()
                 self.optimizer.step()
-                with torch.no_grad():
-                    losses.append(loss.cpu().data.numpy())
-                    train_loss = np.mean(losses)
-                    if step % eval_every == 0:
-                        val_loss, val_f1 = self.evaluate(self.val_dl, tresh)
-                        self.val_record.append({'step': step, 'loss': val_loss, 'f1': val_f1})
-                        info = self.format_info(info = {'best_ep': e, 'step': step, 'train_loss': train_loss,
-                                'val_loss': val_loss, 'val_f1': val_f1})
-                        print('epoch {:02} - step {:06} - train_loss {:.4f} - val_loss {:.4f} - f1 {:.4f}'.format(
-                            *list(info.values())))
 
+                if step % eval_every == 0:
+                    with torch.no_grad():
+                        # train evaluation
+                        losses.append(loss.cpu().data.numpy())
+                        train_loss = np.mean(losses)
+
+                        # val evaluation
+                        val_loss, val_f1 = self.evaluate(self.val_dl, tresh)
+                        self.recorder.val_record.append({'step': step, 'loss': val_loss, 'f1': val_f1})
+                        info = {'best_ep': e, 'step': step, 'train_loss': train_loss,
+                                'val_loss': val_loss, 'val_f1': val_f1}
+                        self.recorder.save_step(info, message=True)
                         if val_f1  >= max_f1:
-                            self.save(info)
+                            self.recorder.save(self.model, info)
                             max_f1 = val_f1
                             no_improve_in_previous_epoch = False
+                        if val_loss < min_loss:
+                            min_loss = val_loss
 
-                        """if 'target' in next(iter(self.test_dl)).fields:
+                        # test evaluation
+                        if self.args.test:
                             test_loss, test_f1 =  self.evaluate(self.test_dl, tresh)
                             test_info = {'test_ep': e, 'test_step': step, 'test_loss': test_loss, 'test_f1': test_f1}
-                            self.test_record.append({'step': step, 'loss': test_loss, 'f1': test_f1})
+                            self.recorder.test_record.append({'step': step, 'loss': test_loss, 'f1': test_f1})
                             print('epoch {:02} - step {:06} - test_loss {:.4f} - test_f1 {:.4f}'.format(*list(test_info.values())))
                             if test_f1 >= max_test_f1:
                                 max_test_f1 = test_f1
-                                best_test_info = test_info"""
+                                best_test_info = test_info
 
-        """"if best_test_info:
-            self.append_info(best_test_info)
-            print('Best results for test:', best_test_info)"""
+        tr_time = print_duration(time_start, 'Training time: ')
+        self.recorder.append_info({'ep_time': tr_time/(e + 1)})
 
-        print_duration(time_start, 'Training time: ')
+        if self.args.test:
+            self.recorder.append_info(best_test_info, message='Best results for test:')
+        self.recorder.append_info({'min_loss': min_loss}, 'Min val loss: ')
 
-        # calculate train loss and train f1_score
-        print('Evaluating model on train dataset')
+        self.model, info = self.recorder.load(message = 'Best model:')
+
+        # final train evaluation
         train_loss, train_f1 = self.evaluate(self.train_dl, tresh)
-        tr_info = self.format_info({'train_loss':train_loss, 'train_f1':train_f1})
-        print(tr_info)
-        self.append_info(tr_info)
+        tr_info = {'train_loss':train_loss, 'train_f1':train_f1}
+        self.recorder.append_info(tr_info, message='Train loss and f1:')
 
-        m_info = self.load()
-        print(f'Best model: {m_info}')
+
 
     def evaluate(self, dl, tresh):
         with torch.no_grad():
             dl.init_epoch()
+            self.model.cell.flatten_parameters()
             self.model.eval()
             self.model.zero_grad()
             loss = []
@@ -476,7 +642,7 @@ class Learner:
             print('Predicting validation dataset...')
             dl = self.val_dl
 
-        self.model.lstm.flatten_parameters()
+        self.model.cell.flatten_parameters()
         self.model.eval()
         y_pred = []
         y_true = []
@@ -493,7 +659,6 @@ class Learner:
 
     def predict_labels(self, is_test=False, tresh=0.5):
         def _choose_tr(self, min_tr, max_tr, tr_step):
-            print('Choosing treshold.\n')
             val_pred, val_true, _ = self.predict_probs(is_test=False)
             tmp = [0, 0, 0]  # idx, current_f1, max_f1
             tr = min_tr
@@ -511,16 +676,32 @@ class Learner:
 
         if type(tresh) == list:
             tresh, max_f1 = _choose_tr(self, *tresh)
-            self.append_info({'best_tr': tresh, 'best_f1': max_f1})
+            self.recorder.append_info({'best_tr': tresh, 'best_f1': max_f1})
 
         y_label = (np.array(y_pred) >= tresh).astype(int)
         return y_label, y_true, ids, tresh
 
-    def save(self, info):
-        os.makedirs(self.models_dir, exist_ok=True)
-        if self.args.mode == 'run':
-            torch.save(self.model, self.best_model_path)
-        torch.save(info, self.best_info_path)
+
+
+
+
+class Recorder:
+
+    models_dir = './models'
+    best_model_path = './models/best_model.m'
+    best_info_path = './models/best_model.info'
+    record_dir = './notes'
+
+    def __init__(self, args):
+        self.args = args
+        if self.args.mode == 'test':
+            self.record_path = './notes/test_records.csv'
+        elif self.args.mode == 'run':
+            self.record_path = './notes/records.csv'
+        self.val_record = []
+        self.tr_record = []
+        self.test_record = []
+        self.new = True
 
     @staticmethod
     def format_info(info):
@@ -531,18 +712,46 @@ class Learner:
         return info
 
     @classmethod
-    def append_info(cls, dict):
+    def append_info(cls, dict, message=None):
         dict = cls.format_info(dict)
+        if message:
+            print(message, dict)
         info = torch.load(cls.best_info_path)
         info.update(dict)
         torch.save(info, cls.best_info_path)
 
-    def record(self):
+    def save(self, model, info):
+        os.makedirs(self.models_dir, exist_ok=True)
+        torch.save(model, self.best_model_path)
+        info = self.format_info(info)
+        torch.save(info, self.best_info_path)
+
+    def load(self, message=None):
+        model = torch.load(self.best_model_path)
+        info = torch.load(self.best_info_path)
+        if message:
+            print(message, info)
+        return model, info
+
+    def save_step(self, step_info, message = False):
+        if self.new:
+            header = True
+            mode = 'w'
+            self.new = False
+        else:
+            header=False
+            mode = 'a'
+        dict_to_csv(step_info, 'steps.csv', mode, orient='columns', header=header)
+        if message:
+            print('epoch {:02} - step {:06} - train_loss {:.4f} - val_loss {:.4f} - f1 {:.4f}'.format(
+                *list(step_info.values())))
+
+    def record(self, fold):
         # save plots
-        save_plot(self.val_record, 'loss', self.args.n_eval)
-        save_plot(self.val_record, 'f1', self.args.n_eval)
-        save_plot(self.train_record, 'tr_loss', self.args.n_eval)
-        save_plots([self.val_record, self.test_record], ['loss', 'f1'], ['val', 'test'],self.args.n_eval)
+        save_plot(self.val_record, 'loss', self.args.n_eval, 'val_loss')
+        save_plot(self.val_record, 'f1', self.args.n_eval, 'val_f1')
+        if self.args.test:
+            save_plots([self.val_record, self.test_record], ['loss', 'f1'], ['val', 'test'],self.args.n_eval)
 
         # create subdir for this experiment
         os.makedirs(self.record_dir, exist_ok=True)
@@ -561,15 +770,11 @@ class Learner:
         passed_args = ' '.join(sys.argv[1:])
         param_dict = {'hash':hash, 'subdir':subdir, **param_dict, **info, 'args': passed_args}
         dict_to_csv(param_dict, csvlog, 'w', 'index', reverse=False)
-        dict_to_csv(param_dict, self.record_path, 'a', 'columns', reverse=True)
+        header = True if fold == 0 else False
+        dict_to_csv(param_dict, self.record_path, 'a', 'columns', reverse=True, header=header)
 
         # copy all records to subdir
-        copy_files(['*.png', 'models/*.m', 'models/*.info'], subdir)
-
-    def load(self):
-        self.model = torch.load(self.best_model_path)
-        info = torch.load(self.best_info_path)
-        return info
+        copy_files(['*.png', 'models/*.info', 'steps.csv'], subdir)
 #!/usr/bin/env python
 
 
@@ -584,7 +789,8 @@ def parse_script_args():
 
     # data preprocessing params
     arg('--kfold', '-k', type=int)
-    arg('--split_ratio', '-sr', nargs='+', default=0.8, type=float)
+    arg('--split_ratio', '-sr', nargs='+', default=[0.8], type=float)
+    arg('--test', action='store_true') # if present split data in train-val-test else split train-val
     arg('--seed', default=2018, type=int)
     arg('--tokenizer', '-t', default='spacy', choices=['spacy'])
     arg('--embedding', '-em', default='glove', choices=['glove', 'google_news', 'paragram', 'wiki_news'])
@@ -593,20 +799,20 @@ def parse_script_args():
     arg('--optim', '-o', default='Adam', choices=['Adam', 'AdamW'])
     arg('--epoch', '-e', default=7, type=int)
     arg('--lr', '-lr', default=1e-3, type=float)
+    arg('--lrstep', default=[3], nargs='+', type=int) # steps when lr multiplied by 0.1
     arg('--batch_size', '-bs', default=512, type=int)
     arg('--n_eval', '-ne', default=1, type=int, help='Number of validation set evaluations during 1 epoch')
     arg('--warmup_epoch', '-we', default=2, type=int, help='Number of epochs without fine tuning')
     arg('--early_stop', '-es', default=1, type=int, help='Stop training if no improvement during this number of epochs')
-    arg('--f1_tresh', '-ft', default=0.33, type=float)
+    arg('--f1_tresh', '-ft', default=0.335, type=float)
 
     # model params
-    arg('--model', '-m', default='BiLSTM', choices=['BiLSTM'])
+    arg('--model', '-m', default='BiLSTM', choices=['BiLSTM', 'BiGRU', 'BiLSTMPool', 'BiLSTM_2FC', 'BiGRUPool', 'BiGRUPool_2FC', 'BiLSTMPool_2FC'])
     arg('--n_layers', '-n', default=2, type=int, help='Number of layers in model')
     arg('--hidden_dim', '-hd', type=int, default=100)
     arg('--dropout', '-d', type=float, default=0.2)
 
     args = parser.parse_args()
-    print(args)
     return args
 
 
@@ -641,6 +847,10 @@ def analyze_args(args):
         if not check_changes_commited():
             sys.exit("Please commit all changes!")
 
+    # split ratio should be float if len == 1
+    sr = args.split_ratio
+    if len(sr) == 1:
+        args.split_ratio = sr[0]
     return train_csv, test_csv, emb_path, cache
 
 
@@ -651,13 +861,13 @@ def main(args, train_csv, test_csv, embedding, cache):
     random.seed(args.seed)
     k = args.kfold
     if k:
-        data_iter = train.split_kfold(k, is_test=True, random_state=random.getstate())
+        data_iter = train.split_kfold(k, is_test=args.test, random_state=random.getstate())
     else:
         data_iter = train.split(args.split_ratio, random_state=random.getstate())
 
     # iterate through folds
-    for d in data_iter:
-        print(len(d))
+    for fold, d in enumerate(data_iter):
+        print(f'========== Fold {fold} ==========')
         if len(d) == 2:
             train, val = d
         else:
@@ -673,22 +883,61 @@ def main(args, train_csv, test_csv, embedding, cache):
                            padding_idx=text.vocab.stoi[text.pad_token],
                            hidden_dim=args.hidden_dim,
                            dropout=args.dropout).cuda()
+        if args.model == 'BiGRU':
+            model = BiGRU(text.vocab.vectors,
+                           lstm_layer=args.n_layers,
+                           padding_idx=text.vocab.stoi[text.pad_token],
+                           hidden_dim=args.hidden_dim,
+                           dropout=args.dropout).cuda()
+        if args.model == 'BiLSTMPool':
+            model = BiLSTMPool(text.vocab.vectors,
+                           lstm_layer=args.n_layers,
+                           padding_idx=text.vocab.stoi[text.pad_token],
+                           hidden_dim=args.hidden_dim,
+                           dropout=args.dropout).cuda()
+        if args.model == 'BiGRUPool':
+            model = BiGRUPool(text.vocab.vectors,
+                               lstm_layer=args.n_layers,
+                               padding_idx=text.vocab.stoi[text.pad_token],
+                               hidden_dim=args.hidden_dim,
+                               dropout=args.dropout).cuda()
+        if args.model == 'BiLSTM_2FC':
+            model = BiLSTM_2FC(text.vocab.vectors,
+                               lstm_layer=args.n_layers,
+                               padding_idx=text.vocab.stoi[text.pad_token],
+                               hidden_dim=args.hidden_dim,
+                               dropout=args.dropout).cuda()
+
+        if args.model == 'BiGRUPool_2FC':
+            model = BiGRUPool_2FC(text.vocab.vectors,
+                               lstm_layer=args.n_layers,
+                               padding_idx=text.vocab.stoi[text.pad_token],
+                               hidden_dim=args.hidden_dim,
+                               dropout=args.dropout).cuda()
+
+        if args.model == 'BiLSTMPool_2FC':
+            model = BiLSTMPool_2FC(text.vocab.vectors,
+                               lstm_layer=args.n_layers,
+                               padding_idx=text.vocab.stoi[text.pad_token],
+                               hidden_dim=args.hidden_dim,
+                               dropout=args.dropout).cuda()
+
         if args.optim == 'Adam':
             optimizer = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=args.lr)
         elif args.optim == 'AdamW':
             optimizer = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=args.lr, betas=(0.9, 0.99))
-        scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=[10], gamma=0.1)
+        scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=args.lrstep, gamma=0.1)
         loss_function = nn.BCEWithLogitsLoss()
         learn = Learner(model, dataloaders, loss_function, optimizer, scheduler, args)
         learn.fit(args.epoch, eval_every, args.f1_tresh, args.early_stop, args.warmup_epoch)
 
         # predict test labels
-        learn.load()
-        test_label, _, test_ids, tresh = learn.predict_labels(is_test=True, tresh=[0.01, 0.5, 0.01])
-        if len(d) == 3:
-            test_loss_old, test_f1_old = learn.evaluate(learn.test_dl, args.f1_tresh)
-            print('Test results at point with best va lidation f1:', test_loss_old, test_f1_old)
-        learn.record()
+        learn.recorder.load()
+        test_label, _, test_ids, tresh = learn.predict_labels(is_test=True, tresh = [0.01, 0.5, 0.01])
+        if args.test:
+            test_loss, test_f1 = learn.evaluate(learn.test_dl, args.f1_tresh)
+            print('Test loss and f1:', test_loss, test_f1)
+        learn.recorder.record(fold)
     test_ids = [qid.vocab.itos[i] for i in test_ids]
     submit(test_ids, test_label)
 
