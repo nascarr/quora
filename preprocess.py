@@ -6,6 +6,20 @@ from utils import print_duration
 from dataloader import MyTabularDataset
 
 
+def choose_tokenizer(tokenizer):
+    if tokenizer == 'whitespace':
+        return WhitespaceTokenizer()
+    else:
+        return tokenizer
+
+
+class WhitespaceTokenizer(object):
+    def __init__(self):
+        pass
+
+    def __call__(self, text):
+        words = text.split(' ')
+        return words
 
 
 def preprocess(train_csv, test_csv, tokenizer, embeddings, cache):

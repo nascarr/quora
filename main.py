@@ -8,7 +8,7 @@ import torch.optim as optim
 import argparse
 
 from models import *
-from preprocess import preprocess, iterate
+from preprocess import preprocess, iterate, WhitespaceTokenizer, choose_tokenizer
 from learner import Learner
 from utils import submit, check_changes_commited
 from create_test_datasets import reduce_embedding, reduce_datasets
@@ -26,7 +26,7 @@ def parse_script_args():
     arg('--split_ratio', '-sr', nargs='+', default=[0.8], type=float)
     arg('--test', action='store_true') # if present split data in train-val-test else split train-val
     arg('--seed', default=2018, type=int)
-    arg('--tokenizer', '-t', default='spacy', choices=['spacy'])
+    arg('--tokenizer', '-t', default='spacy', choices=['spacy', 'whitespace'])
     arg('--embedding', '-em', default='glove', choices=['glove', 'google_news', 'paragram', 'wiki_news'])
 
     # training params
@@ -90,8 +90,8 @@ def analyze_args(args):
 
 
 def main(args, train_csv, test_csv, embedding, cache):
-    train, test, text, qid = preprocess(train_csv, test_csv, args.tokenizer, embedding, cache)
-
+    tokenizer = choose_tokenizer(args.tokenizer)
+    train, test, text, qid = preprocess(train_csv, test_csv, tokenizer, embedding, cache)
     # split train dataset
     random.seed(args.seed)
     k = args.kfold
