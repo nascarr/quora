@@ -167,11 +167,11 @@ def main(args, train_csv, test_csv, embedding, cache):
         learn.fit(args.epoch, eval_every, args.f1_tresh, args.early_stop, args.warmup_epoch, args.clip)
 
         # predict test labels
-        learn.recorder.load()
-        test_label, _, test_ids, tresh = learn.predict_labels(is_test=True, tresh = [0.01, 0.5, 0.01])
+        learn.model, info = learn.recorder.load()
+        test_label, _, test_ids, tresh = learn.predict_labels(is_test=True, tresh = args.f1_tresh)
         if args.test:
             test_loss, test_f1 = learn.evaluate(learn.test_dl, args.f1_tresh)
-            print('Test loss and f1:', test_loss, test_f1)
+            learn.recorder.append_info({'test_loss': test_loss, 'test_f1': test_f1}, message='Test set results: ')
         learn.recorder.record(fold)
     test_ids = [qid.vocab.itos[i] for i in test_ids]
     submit(test_ids, test_label)

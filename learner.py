@@ -71,7 +71,7 @@ class Learner:
                 self.recorder.tr_record.append({'tr_loss': loss.cpu().data.numpy()})
                 loss.backward()
                 total_norm = nn.utils.clip_grad_norm_(self.model.parameters(), clip)
-                parameters = list(filter(lambda p: p.grad is not None, self.model.parameters()))
+                # parameters = list(filter(lambda p: p.grad is not None, self.model.parameters()))
                 # total_norm = 0
                 # for p in parameters:
                 #     param_norm = p.grad.data.norm(2)
@@ -93,7 +93,7 @@ class Learner:
                         info = {'best_ep': e, 'step': step, 'train_loss': train_loss,
                                 'val_loss': val_loss, 'val_f1': val_f1}
                         self.recorder.save_step(info, message=True)
-                        if val_f1  >= max_f1:
+                        if val_f1  > max_f1:
                             self.recorder.save(self.model, info)
                             max_f1 = val_f1
                             no_improve_in_previous_epoch = False
@@ -101,20 +101,20 @@ class Learner:
                             min_loss = val_loss
 
                         # test evaluation
-                        if self.args.test:
-                            test_loss, test_f1 =  self.evaluate(self.test_dl, tresh)
-                            test_info = {'test_ep': e, 'test_step': step, 'test_loss': test_loss, 'test_f1': test_f1}
-                            self.recorder.test_record.append({'step': step, 'loss': test_loss, 'f1': test_f1})
-                            print('epoch {:02} - step {:06} - test_loss {:.4f} - test_f1 {:.4f}'.format(*list(test_info.values())))
-                            if test_f1 >= max_test_f1:
-                                max_test_f1 = test_f1
-                                best_test_info = test_info
+                        # if self.args.test:
+                        #     test_loss, test_f1 =  self.evaluate(self.test_dl, tresh)
+                        #    test_info = {'test_ep': e, 'test_step': step, 'test_loss': test_loss, 'test_f1': test_f1}
+                        #    self.recorder.test_record.append({'step': step, 'loss': test_loss, 'f1': test_f1})
+                        #     print('epoch {:02} - step {:06} - test_loss {:.4f} - test_f1 {:.4f}'.format(*list(test_info.values())))
+                         #   if test_f1 >= max_test_f1:
+                         #       max_test_f1 = test_f1
+                         #       best_test_info = test_info
 
         tr_time = print_duration(time_start, 'Training time: ')
         self.recorder.append_info({'ep_time': tr_time/(e + 1)})
 
-        if self.args.test:
-            self.recorder.append_info(best_test_info, message='Best results for test:')
+        #if self.args.test:
+        #    self.recorder.append_info(best_test_info, message='Best results for test:')
         self.recorder.append_info({'min_loss': min_loss}, 'Min val loss: ')
 
         self.model, info = self.recorder.load(message = 'Best model:')
