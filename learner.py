@@ -51,6 +51,7 @@ class Learner:
                 if no_improve_in_previous_epoch:
                     no_improve_epoch += 1
                     if no_improve_epoch >= early_stop:
+                        e = e-1
                         break
                 else:
                     no_improve_epoch = 0

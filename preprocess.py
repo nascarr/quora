@@ -94,8 +94,3 @@ def iterate(train, val, test, batch_size):
                                         sort=False,
                                         train=False)
         return train_iter, val_iter, test_iter
-
-if __name__ == '__main__':
-    tok = CustomTokenizer()
-    str = 'I love yo-u! Yes, ,no, yes?'
-    print(tok(str))
