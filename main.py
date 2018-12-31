@@ -86,6 +86,8 @@ def analyze_args(args):
     sr = args.split_ratio
     if len(sr) == 1:
         args.split_ratio = sr[0]
+    if len(sr) == 3:
+        args.test = True
     return train_csv, test_csv, emb_path, cache
 
 
