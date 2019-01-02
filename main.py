@@ -8,7 +8,9 @@ import torch.optim as optim
 import argparse
 
 from models import *
-from preprocess import preprocess, iterate, WhitespaceTokenizer, choose_tokenizer
+from preprocess import preprocess, split, iterate
+from tokenizers import WhitespaceTokenizer
+from choose import choose_tokenizer
 from learner import Learner
 from utils import submit, check_changes_commited
 from create_test_datasets import reduce_embedding, reduce_datasets
@@ -96,11 +98,7 @@ def main(args, train_csv, test_csv, embedding, cache):
     train, test, text, qid = preprocess(train_csv, test_csv, tokenizer, embedding, cache)
     # split train dataset
     random.seed(args.seed)
-    k = args.kfold
-    if k:
-        data_iter = train.split_kfold(k, is_test=args.test, random_state=random.getstate())
-    else:
-        data_iter = train.split(args.split_ratio, random_state=random.getstate())
+    data_iter = split(train, args)
 
     # iterate through folds
     for fold, d in enumerate(data_iter):
