@@ -7,10 +7,9 @@ import torch.nn as nn
 import torch.optim as optim
 import argparse
 
-from models import *
 from preprocess import preprocess, split, iterate
 from tokenizers import WhitespaceTokenizer
-from choose import choose_tokenizer
+from choose import choose_tokenizer, choose_model, choose_optimizer
 from learner import Learner
 from utils import submit, check_changes_commited
 from create_test_datasets import reduce_embedding, reduce_datasets
@@ -103,67 +102,21 @@ def main(args, train_csv, test_csv, embedding, cache):
     # iterate through folds
     for fold, d in enumerate(data_iter):
         print(f'========== Fold {fold} ==========')
+        # get dataloaders
         if len(d) == 2:
             train, val = d
         else:
             train, val, test = d
         train_iter, val_iter, test_iter = iterate(train, val, test, args.batch_size)
-        eval_every = int(len(list(iter(train_iter))) / args.n_eval)
         dataloaders = train_iter, val_iter, test_iter
 
         # choose model, optimizer, lr scheduler and loss function
-        if args.model == 'BiLSTM':
-            model = BiLSTM(text.vocab.vectors,
-                           lstm_layer=args.n_layers,
-                           padding_idx=text.vocab.stoi[text.pad_token],
-                           hidden_dim=args.hidden_dim,
-                           dropout=args.dropout).cuda()
-        if args.model == 'BiGRU':
-            model = BiGRU(text.vocab.vectors,
-                           lstm_layer=args.n_layers,
-                           padding_idx=text.vocab.stoi[text.pad_token],
-                           hidden_dim=args.hidden_dim,
-                           dropout=args.dropout).cuda()
-        if args.model == 'BiLSTMPool':
-            model = BiLSTMPool(text.vocab.vectors,
-                           lstm_layer=args.n_layers,
-                           padding_idx=text.vocab.stoi[text.pad_token],
-                           hidden_dim=args.hidden_dim,
-                           dropout=args.dropout).cuda()
-        if args.model == 'BiGRUPool':
-            model = BiGRUPool(text.vocab.vectors,
-                               lstm_layer=args.n_layers,
-                               padding_idx=text.vocab.stoi[text.pad_token],
-                               hidden_dim=args.hidden_dim,
-                               dropout=args.dropout).cuda()
-        if args.model == 'BiLSTM_2FC':
-            model = BiLSTM_2FC(text.vocab.vectors,
-                               lstm_layer=args.n_layers,
-                               padding_idx=text.vocab.stoi[text.pad_token],
-                               hidden_dim=args.hidden_dim,
-                               dropout=args.dropout).cuda()
-
-        if args.model == 'BiGRUPool_2FC':
-            model = BiGRUPool_2FC(text.vocab.vectors,
-                               lstm_layer=args.n_layers,
-                               padding_idx=text.vocab.stoi[text.pad_token],
-                               hidden_dim=args.hidden_dim,
-                               dropout=args.dropout).cuda()
-
-        if args.model == 'BiLSTMPool_2FC':
-            model = BiLSTMPool_2FC(text.vocab.vectors,
-                               lstm_layer=args.n_layers,
-                               padding_idx=text.vocab.stoi[text.pad_token],
-                               hidden_dim=args.hidden_dim,
-                               dropout=args.dropout).cuda()
-
-        if args.optim == 'Adam':
-            optimizer = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=args.lr)
-        elif args.optim == 'AdamW':
-            optimizer = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=args.lr, betas=(0.9, 0.99))
+        model = choose_model(text, args)
+        optimizer = choose_optimizer(filter(lambda p: p.requires_grad, model.parameters()), args)
         scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=args.lrstep, gamma=0.1)
         loss_function = nn.BCEWithLogitsLoss()
         learn = Learner(model, dataloaders, loss_function, optimizer, scheduler, args)
+        eval_every = int(len(list(iter(train_iter))) / args.n_eval)
         learn.fit(args.epoch, eval_every, args.f1_tresh, args.early_stop, args.warmup_epoch, args.clip)
 
         # predict test labels
