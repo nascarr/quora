@@ -259,7 +259,7 @@ class Recorder:
         else:
             header=False
             mode = 'a'
-        dict_to_csv(step_info, 'steps.csv', mode, orient='columns', header=header)
+        dict_to_csv(step_info, 'train_steps.csv', mode, orient='columns', header=header)
         if message:
             print('epoch {:02} - step {:06} - train_loss {:.4f} - val_loss {:.4f} - f1 {:.4f}'.format(
                 *list(step_info.values())))
@@ -293,4 +293,4 @@ class Recorder:
         dict_to_csv(param_dict, self.record_path, 'a', 'columns', reverse=True, header=header)
 
         # copy all records to subdir
-        copy_files(['*.png', 'models/*.info', 'steps.csv'], subdir)
+        copy_files(['*.png', 'models/*.info', 'train_steps.csv'], subdir)
