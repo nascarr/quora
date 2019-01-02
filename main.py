@@ -59,6 +59,9 @@ def analyze_args(args):
 
     if args.machine == 'dt':
         data_dir = cache = './data'
+        if args.mode == 'run':
+            if not check_changes_commited():
+                sys.exit("Please commit all changes!")
     elif args.machine == 'kaggle':
         data_dir = '../input'
         cache = '.'
@@ -79,9 +82,8 @@ def analyze_args(args):
         train_small_csv, test_small_csv = reduce_datasets([train_csv, test_csv], data_dir, n_cut)
         emb_small_path = reduce_embedding(emb_path, data_dir, n_cut_emb)
         train_csv, test_csv, emb_path = train_small_csv, test_small_csv, emb_small_path
-    elif args.mode == 'run':
-        if not check_changes_commited():
-            sys.exit("Please commit all changes!")
+    if args.mode == 'run':
+        pass
 
     # split ratio should be float if len == 1
     sr = args.split_ratio
