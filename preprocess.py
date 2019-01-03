@@ -12,7 +12,7 @@ def preprocess(train_csv, test_csv, tokenizer, embedding, cache):
     # types of csv columns
     location = './cachedir'
     time_start = time.time()
-    text = data.Field(batch_first=True, tokenize=tokenizer)
+    text = data.Field(batch_first=True, tokenize=tokenizer, include_lengths=True)
     qid = data.Field()
     target = data.Field(sequential=False, use_vocab=False, is_target=True)
 
@@ -52,17 +52,20 @@ def iterate(train, val, test, batch_size):
                                      batch_size=batch_size,
                                      sort_key=lambda x: x.text.__len__(),
                                      shuffle=True,
-                                     sort=False)
+                                     sort=False,
+                                     sort_within_batch=True)
 
     val_iter = data.BucketIterator(dataset=val,
                                    batch_size=batch_size,
                                    sort_key=lambda x: x.text.__len__(),
                                    train=False,
-                                   sort=False)
+                                   sort=False,
+                                   sort_within_batch=True)
 
     test_iter = data.BucketIterator(dataset=test,
                                     batch_size=batch_size,
                                     sort_key=lambda x: x.text.__len__(),
                                     sort=False,
-                                    train=False)
+                                    train=False,
+                                    sort_within_batch=True)
     return train_iter, val_iter, test_iter

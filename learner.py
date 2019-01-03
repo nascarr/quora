@@ -30,6 +30,9 @@ class Learner:
             self.train_dl = dataloaders
             self.val_dl = self.test_dl = None
 
+    @staticmethod
+    def pack(x, ls):
+        pass
 
     def fit(self, epoch, eval_every, tresh, early_stop, warmup_epoch, clip):
 
@@ -65,9 +68,9 @@ class Learner:
                 step += 1
                 self.model.zero_grad()
                 self.model.train()
-                x = train_batch.text.cuda()
+                x, ls = [tensor.cuda() for tensor in train_batch.text]
                 y = train_batch.target.type(torch.Tensor).cuda()
-                pred = self.model.forward(x).view(-1)
+                pred = self.model.forward(x, ls).view(-1)
                 loss = self.loss_func(pred, y)
                 self.recorder.tr_record.append({'tr_loss': loss.cpu().data.numpy()})
                 loss.backward()
@@ -138,9 +141,9 @@ class Learner:
             n_targs = 0
             n_preds = 0
             for batch in iter(dl):
-                x = batch.text.cuda()
+                x, ls = [tensor.cuda() for tensor in batch.text]
                 y = batch.target.type(torch.Tensor).cuda()
-                pred = self.model.forward(x).view(-1)
+                pred = self.model.forward(x, lengths=ls).view(-1)
                 loss.append(self.loss_func(pred, y).cpu().data.numpy())
                 label = (torch.sigmoid(pred).cpu().data.numpy() > tresh).astype(int)
                 y = y.cpu().data.numpy()
@@ -167,10 +170,10 @@ class Learner:
 
         dl.init_epoch()
         for batch in iter(dl):
-            x = batch.text.cuda()
-            if not is_test:
+            x, ls = [tensor.cuda() for tensor in batch.text]
+            if not is_test or self.args.test:
                 y_true += batch.target.data.numpy().tolist()
-            y_pred += torch.sigmoid(self.model.forward(x).view(-1)).cpu().data.numpy().tolist()
+            y_pred += torch.sigmoid(self.model.forward(x, ls).view(-1)).cpu().data.numpy().tolist()
             ids += batch.qid.view(-1).data.numpy().tolist()
         return y_pred, y_true, ids
 

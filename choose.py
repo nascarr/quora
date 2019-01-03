@@ -1,4 +1,5 @@
 # functions for choosing tokenizer, optimizer and model
+from tokenizers import *
 from models import *
 import torch.optim as optim
 
