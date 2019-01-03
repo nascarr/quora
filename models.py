@@ -79,14 +79,14 @@ class BiLSTMPool(nn.Module):
         unpacked_out, unpacked_len = nn.utils.rnn.pad_packed_sequence(lstm_out)
         sl, bs, _ = unpacked_out.shape
         lstm_out = unpacked_out
-        # lstm_out = lstm_out.view(sl, bs, 2 * self.hidden_dim)
+        lstm_out = lstm_out.view(sl, bs, 2 * self.hidden_dim)
         # output = h_n.view(:, 2, bs, self.hidden_dim)[1]
         # output = torch.cat
         output_list = [lstm_out[:l, i, :] for i, l in enumerate(unpacked_len.cpu().numpy())]
         output = torch.stack([t[-1, :] for t in output_list], dim=1)
-        max_pool= torch.stack([torch.max(t, 0)[0] for t in output_list], dim=1)
-        average_pool = torch.stack([torch.mean(t, 0) for t in output_list], dim=1)
-        long_output = torch.cat((max_pool, average_pool, output), dim=0)
+        # max_pool= torch.stack([torch.max(t, 0)[0] for t in output_list], dim=1)
+        # average_pool = torch.stack([torch.mean(t, 0) for t in output_list], dim=1)
+        long_output = torch.cat((output, output, output), dim=0)
         long_output = torch.transpose(long_output, dim0=1, dim1=0)
         y = self.hidden2label(self.dropout(long_output))
         return y
