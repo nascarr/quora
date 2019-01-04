@@ -43,7 +43,8 @@ def parse_script_args():
     arg('--clip', type=float, default=1, help='gradient clipping')
 
     # model params
-    arg('--model', '-m', default='BiLSTM', choices=['BiLSTM', 'BiGRU', 'BiLSTMPool', 'BiLSTM_2FC', 'BiGRUPool', 'BiGRUPool_2FC', 'BiLSTMPool_2FC'])
+    arg('--model', '-m', default='BiLSTM', choices=['BiLSTM', 'BiGRU', 'BiLSTMPool', 'BiLSTM_2FC', 'BiGRUPool',
+                                                    'BiGRUPool_2FC', 'BiLSTMPool_2FC', 'BiLSTMPool_fast'])
     arg('--n_layers', '-n', default=2, type=int, help='Number of layers in model')
     arg('--hidden_dim', '-hd', type=int, default=100)
     arg('--dropout', '-d', type=float, default=0.2)
