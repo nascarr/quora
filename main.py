@@ -28,7 +28,7 @@ def parse_script_args():
     arg('--test', action='store_true') # if present split data in train-val-test else split train-val
     arg('--seed', default=2018, type=int)
     arg('--tokenizer', '-t', default='spacy', choices=['spacy', 'whitespace', 'custom'])
-    arg('--embedding', '-em', default='glove', choices=['glove', 'google_news', 'paragram', 'wiki_news'])
+    arg('--embedding', '-em', default='glove', choices=['glove', 'gnews', 'paragram', 'wnews'])
 
     # training params
     arg('--optim', '-o', default='Adam', choices=['Adam', 'AdamW'])
@@ -54,7 +54,13 @@ def parse_script_args():
 
 def analyze_args(args):
     if args.embedding == 'glove':
-        emb_path = 'embeddings/glove.840B.300d/glove.840B.300d.txt'
+        emb_path = 'glove.840B.300d/glove.840B.300d.txt'
+    elif args.embedding == 'paragram':
+        emb_path = 'paragram_300_sl999/paragram_300_sl999.txt'
+    elif args.embedding == 'gnews':
+        emb_path = 'GoogleNews-vectors-negative300/GoogleNews-vectors-negative300.bin'
+    elif args.embedding == 'wnews':
+        emb_path = 'wiki-news-300d-1M/wiki-news-300d-1M.vec'
     # TODO: add other embeddings
 
     if args.machine == 'dt':
@@ -68,7 +74,7 @@ def analyze_args(args):
 
     train_csv = os.path.join(data_dir, 'train.csv')
     test_csv = os.path.join(data_dir, 'test.csv')
-    emb_path = os.path.join(data_dir, emb_path)
+    emb_path = os.path.join(data_dir, 'embeddings', emb_path)
 
     if args.mode == 'test':
         # create smaller files for testing main function
