@@ -1,4 +1,20 @@
 import re
+import spacy
+
+
+def lower_spacy(x):
+    x = x.lower()
+    spacy_en = spacy.load('en')
+    return [tok.text for tok in spacy_en.tokenizer(x)]
+
+class LowerSpacy(object):
+    def __init__(self):
+        pass
+
+    def __call__(self, text):
+        spacy_en = spacy.load('en')
+        return lambda x: [tok.text for tok in spacy_en.tokenizer(x)]
+
 
 
 class WhitespaceTokenizer(object):

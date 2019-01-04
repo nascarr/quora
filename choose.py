@@ -9,6 +9,8 @@ def choose_tokenizer(tokenizer):
         return WhitespaceTokenizer()
     elif tokenizer == 'custom':
         return CustomTokenizer()
+    elif tokenizer == 'lowerspacy':
+        return lower_spacy
     else:
         return tokenizer
 

@@ -27,7 +27,7 @@ def parse_script_args():
     arg('--split_ratio', '-sr', nargs='+', default=[0.8], type=float)
     arg('--test', action='store_true') # if present split data in train-val-test else split train-val
     arg('--seed', default=2018, type=int)
-    arg('--tokenizer', '-t', default='spacy', choices=['spacy', 'whitespace', 'custom'])
+    arg('--tokenizer', '-t', default='spacy', choices=['spacy', 'whitespace', 'custom', 'lowerspacy'])
     arg('--embedding', '-em', default='glove', choices=['glove', 'gnews', 'paragram', 'wnews'])
 
     # training params
