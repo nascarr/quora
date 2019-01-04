@@ -34,8 +34,14 @@ def choose_model(text, args):
                            padding_idx=text.vocab.stoi[text.pad_token],
                            hidden_dim=args.hidden_dim,
                            dropout=args.dropout).cuda()
-    if args.model == 'BiLSTMPool_fast':
-        model = BiLSTMPool_fast(text.vocab.vectors,
+    if args.model == 'BiLSTMPoolOld':
+        model = BiLSTMPoolOld(text.vocab.vectors,
+                           lstm_layer=args.n_layers,
+                           padding_idx=text.vocab.stoi[text.pad_token],
+                           hidden_dim=args.hidden_dim,
+                           dropout=args.dropout).cuda()
+    if args.model == 'BiLSTMPoolFast':
+        model = BiLSTMPoolFast(text.vocab.vectors,
                            lstm_layer=args.n_layers,
                            padding_idx=text.vocab.stoi[text.pad_token],
                            hidden_dim=args.hidden_dim,

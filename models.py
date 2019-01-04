@@ -52,7 +52,41 @@ class BiGRU(nn.Module):
         y = self.hidden2label(self.dropout(torch.cat([h_n[i, :, :] for i in range(h_n.shape[0])], dim=1)))
         return y
 
+
+class BiLSTMPoolOld(nn.Module):
+    # constant length for all sequences in batch
+    def __init__(self, pretrained_lm, padding_idx, static=True, hidden_dim=100, lstm_layer=2, dropout=0.2):
+        super(BiLSTMPoolOld, self).__init__()
+        self.hidden_dim = hidden_dim
+        self.dropout = nn.Dropout(p=dropout)
+        self.embedding = nn.Embedding.from_pretrained(pretrained_lm)
+        self.embedding.padding_idx = padding_idx
+        if static:
+            self.embedding.weight.requires_grad = False
+        self.lstm = nn.LSTM(input_size=self.embedding.embedding_dim,
+                            hidden_size=hidden_dim,
+                            num_layers=lstm_layer,
+                            dropout=dropout,
+                            bidirectional=True)
+        self.hidden2label = nn.Linear(hidden_dim * 6, 1)
+        self.cell = self.lstm
+
+    def forward(self, sents):
+        x = self.embedding(sents)
+        x = torch.transpose(x, dim0=1, dim1=0)
+        lstm_out, (h_n, c_n) = self.lstm(x)
+        sl, bs, _ = lstm_out.shape
+        lstm_out = lstm_out.view(sl, bs, 2 * self.hidden_dim)
+        output = lstm_out[-1]
+        max_pool, _ = torch.max(lstm_out, 0)
+        average_pool = torch.mean(lstm_out, 0)
+        y = self.hidden2label(self.dropout(torch.cat((max_pool, average_pool, output), dim=1)))
+        return y
+
+
+
 class BiLSTMPool(nn.Module):
+    # variable length for sequences in batch
     def __init__(self, pretrained_lm, padding_idx, static=True, hidden_dim=100, lstm_layer=2, dropout=0.2):
         super(BiLSTMPool, self).__init__()
         self.hidden_dim = hidden_dim
@@ -89,9 +123,10 @@ class BiLSTMPool(nn.Module):
         return y
 
 
-class BiLSTMPool_fast(nn.Module):
+class BiLSTMPoolFast(nn.Module):
+    # varibale length for sequences in batch. code optimized for performance
     def __init__(self, pretrained_lm, padding_idx, static=True, hidden_dim=100, lstm_layer=2, dropout=0.2):
-        super(BiLSTMPool_fast, self).__init__()
+        super(BiLSTMPoolFast, self).__init__()
         self.hidden_dim = hidden_dim
         self.num_layers = lstm_layer
         self.dropout = nn.Dropout(p=dropout)
