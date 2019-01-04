@@ -10,7 +10,7 @@ def choose_tokenizer(tokenizer):
     elif tokenizer == 'custom':
         return CustomTokenizer()
     elif tokenizer == 'lowerspacy':
-        return lower_spacy
+        return LowerSpacy()
     else:
         return tokenizer
 

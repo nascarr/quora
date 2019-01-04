@@ -3,17 +3,16 @@ import spacy
 
 
 def lower_spacy(x):
-    x = x.lower()
     spacy_en = spacy.load('en')
-    return [tok.text for tok in spacy_en.tokenizer(x)]
+    tokens = [tok.text.lower() for tok in spacy_en.tokenizer(x)]
+    return tokens
 
 class LowerSpacy(object):
     def __init__(self):
-        pass
+        self.tokenizer = spacy.load('en').tokenizer
 
-    def __call__(self, text):
-        spacy_en = spacy.load('en')
-        return lambda x: [tok.text for tok in spacy_en.tokenizer(x)]
+    def __call__(self, x):
+        return [tok.text.lower() for tok in self.tokenizer(x)]
 
 
 
