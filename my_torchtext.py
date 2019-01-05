@@ -1,4 +1,8 @@
+# Overriding torchtext methods
+
+
 from torchtext.data.dataset import *
+from torchtext.vocab import Vectors
 import numpy as np
 
 
@@ -53,3 +57,22 @@ class MyTabularDataset(TabularDataset):
         cut_idxs = [e * fold_len for e in list(range(k))] + [N]
         data_iter = _iter_folds()
         return data_iter
+
+
+class MyVectors(Vectors):
+    #def __init__(self, *args, **kwargs):
+    #    self.tokens = 0
+    #    super(MyVectors, self).__init__(*args, *kwargs)
+    #
+
+
+    def __getitem__(self, token):
+        if token in self.stoi:
+            #self.tokens += 1
+            #print(self.tokens, self.low_tokens)
+            return self.vectors[self.stoi[token]]
+        elif token.lower() in self.stoi:
+            #self.low_tokens += 1
+            return self.vectors[self.stoi[token.lower()]]
+        else:
+            return self.unk_init(torch.Tensor(self.dim))

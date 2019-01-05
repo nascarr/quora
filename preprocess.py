@@ -5,7 +5,7 @@ import random
 
 from tokenizers import WhitespaceTokenizer, CustomTokenizer
 from utils import print_duration
-from dataloader import MyTabularDataset
+from my_torchtext import MyTabularDataset, MyVectors
 
 
 def preprocess(train_csv, test_csv, tokenizer, embedding, cache, var_length=False):
@@ -32,7 +32,7 @@ def preprocess(train_csv, test_csv, tokenizer, embedding, cache, var_length=Fals
     # embeddings lookup
     print('Embedding lookup...')
     time_start = time.time()
-    text.vocab.load_vectors(vocab.Vectors(embedding, cache=cache))
+    text.vocab.load_vectors(MyVectors(embedding, cache=cache))
     print_duration(time_start, 'Time for embedding lookup: ')
 
     return train, test, text, qid
