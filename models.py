@@ -20,7 +20,7 @@ class BiLSTM(nn.Module):
         self.hidden2label = nn.Linear(hidden_dim * lstm_layer * 2, 1)
         self.cell = self.lstm
 
-    def forward(self, sents):
+    def forward(self, sents, length):
         x = self.embedding(sents)
         x = torch.transpose(x, dim0=1, dim1=0)
         lstm_out, (h_n, c_n) = self.lstm(x)
@@ -45,7 +45,7 @@ class BiGRU(nn.Module):
         self.hidden2label = nn.Linear(hidden_dim * lstm_layer * 2, 1)
         self.cell = self.gru
 
-    def forward(self, sents):
+    def forward(self, sents, length):
         x = self.embedding(sents)
         x = torch.transpose(x, dim0=1, dim1=0)
         gru_out, h_n = self.gru(x)
@@ -71,7 +71,7 @@ class BiLSTMPoolOld(nn.Module):
         self.hidden2label = nn.Linear(hidden_dim * 6, 1)
         self.cell = self.lstm
 
-    def forward(self, sents):
+    def forward(self, sents, length):
         x = self.embedding(sents)
         x = torch.transpose(x, dim0=1, dim1=0)
         lstm_out, (h_n, c_n) = self.lstm(x)
@@ -103,12 +103,11 @@ class BiLSTMPool(nn.Module):
         self.hidden2label = nn.Linear(hidden_dim * 6, 1)
         self.cell = self.lstm
 
-    def forward(self, sents, lengths=None):
+    def forward(self, sents, lengths):
         x = self.embedding(sents)
         x = torch.transpose(x, dim0=1, dim1=0)
-        if lengths is not None:
-            lengths = lengths.view(-1).tolist()
-            packed_x = nn.utils.rnn.pack_padded_sequence(x, lengths)
+        lengths = lengths.view(-1).tolist()
+        packed_x = nn.utils.rnn.pack_padded_sequence(x, lengths)
         lstm_out, (h_n, c_n) = self.lstm(packed_x)
         unpacked_out, unpacked_len = nn.utils.rnn.pad_packed_sequence(lstm_out)
         sl, bs, _ = unpacked_out.shape
@@ -179,7 +178,7 @@ class BiLSTM_2FC(nn.Module):
         self.fc2 = nn.Linear(hidden_dim, 1)
         self.cell = self.lstm
 
-    def forward(self, sents):
+    def forward(self, sents, length):
         x = self.embedding(sents)
         x = torch.transpose(x, dim0=1, dim1=0)
         lstm_out, (h_n, c_n) = self.lstm(x)
@@ -204,7 +203,7 @@ class BiGRUPool(nn.Module):
         self.hidden2label = nn.Linear(hidden_dim * 6, 1)
         self.cell = self.gru
 
-    def forward(self, sents):
+    def forward(self, sents, length):
         x = self.embedding(sents)
         x = torch.transpose(x, dim0=1, dim1=0)
         lstm_out, _ = self.gru(x)
@@ -235,7 +234,7 @@ class BiGRUPool_2FC(nn.Module):
         self.fc2 = nn.Linear(hidden_dim, 1)
         self.cell = self.gru
 
-    def forward(self, sents):
+    def forward(self, sents, length):
         x = self.embedding(sents)
         x = torch.transpose(x, dim0=1, dim1=0)
         lstm_out, _ = self.gru(x)
@@ -266,7 +265,7 @@ class BiLSTMPool_2FC(nn.Module):
         self.fc2 = nn.Linear(hidden_dim, 1)
         self.cell = self.lstm
 
-    def forward(self, sents):
+    def forward(self, sents, length):
         x = self.embedding(sents)
         x = torch.transpose(x, dim0=1, dim1=0)
         lstm_out, _, _ = self.lstm(x)

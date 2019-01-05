@@ -8,11 +8,11 @@ from utils import print_duration
 from dataloader import MyTabularDataset
 
 
-def preprocess(train_csv, test_csv, tokenizer, embedding, cache):
+def preprocess(train_csv, test_csv, tokenizer, embedding, cache, var_length=False):
     # types of csv columns
     location = './cachedir'
     time_start = time.time()
-    text = data.Field(batch_first=True, tokenize=tokenizer, include_lengths=True)
+    text = data.Field(batch_first=True, tokenize=tokenizer, include_lengths=var_length)
     qid = data.Field()
     target = data.Field(sequential=False, use_vocab=False, is_target=True)
 
