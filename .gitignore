@@ -1,5 +1,6 @@
 **/data
 *.txt
+*.txt.pt
 !requirements.txt
 *.csv
 *.csv#
