@@ -1,5 +1,5 @@
 import re
-
+import numpy as np
 
 def print_df_values(df):
     for q in df.values:
@@ -10,6 +10,42 @@ def print_df_values(df):
 def token_info(tokens):
     print('Number of tokens: ', len(tokens))
     print('First 10 tokens: ', tokens[:10])
+
+
+def txtlen(path, header=False):
+    count = 0
+    with open(path) as f:
+        for line in f:
+            count += 1
+    if header:
+        count -= 1
+    return count
+
+
+def emb_to_array(path, max_n=None):
+    total = txtlen(path)
+    if max_n:
+        if max_n < total:
+            total = max_n
+    emb_vectors = np.zeros((total, 300))
+    idx = 0
+    for t, e in read_emb(path):
+        if idx >= total:
+            break
+        e = np.array(e)
+        emb_vectors[idx] = e
+        idx += 1
+    return emb_vectors
+
+
+def read_emb(path):
+    with open(path) as f:
+        for line in f:
+            cut = line.find(' ')
+            tok = line[:cut]
+            emb = line[cut + 1:].split()
+            emb = [float(e) for e in emb]
+            yield tok, emb
 
 
 class TokenTypes:
@@ -55,4 +91,7 @@ class TokenTypes:
         print('Rare up tokens: ', self.up_tokens[-10:], '\n')
         print('Freq caps tokens: ', self.caps_tokens[:10])
         print('Rare caps tokens: ', self.caps_tokens[-10:])
+
+
+
 
