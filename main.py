@@ -30,6 +30,7 @@ def parse_script_args():
     arg('--tokenizer', '-t', default='spacy', choices=['spacy', 'whitespace', 'custom', 'lowerspacy'])
     arg('--embedding', '-em', default='glove', choices=['glove', 'gnews', 'paragram', 'wnews'])
     arg('--var_length', '-vl', action = 'store_true') # variable sequence length in batches
+    arg('--unk_std', '-us', default = 0.5, type=float)
 
     # training params
     arg('--optim', '-o', default='Adam', choices=['Adam', 'AdamW'])
@@ -104,7 +105,7 @@ def analyze_args(args):
 
 def main(args, train_csv, test_csv, embedding, cache):
     tokenizer = choose_tokenizer(args.tokenizer)
-    train, test, text, qid = preprocess(train_csv, test_csv, tokenizer, embedding, cache, args.var_length)
+    train, test, text, qid = preprocess(train_csv, test_csv, tokenizer, embedding, cache, args.unk_std, args.var_length)
     # split train dataset
     random.seed(args.seed)
     data_iter = split(train, args)

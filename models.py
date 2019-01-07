@@ -123,7 +123,7 @@ class BiLSTMPool(nn.Module):
 
 
 class BiLSTMPoolFast(nn.Module):
-    # varibale length for sequences in batch. code optimized for performance
+    # varibale length for sequences in batch,  optimized for performance
     def __init__(self, pretrained_lm, padding_idx, static=True, hidden_dim=100, lstm_layer=2, dropout=0.2):
         super(BiLSTMPoolFast, self).__init__()
         self.hidden_dim = hidden_dim

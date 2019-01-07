@@ -1,14 +1,20 @@
 import torchtext.data as data
 import torchtext.vocab as vocab
+import torch
 import time
 import random
-
+import numpy as np
 from tokenizers import WhitespaceTokenizer, CustomTokenizer
 from utils import print_duration
 from my_torchtext import MyTabularDataset, MyVectors
+from functools import partial
 
 
-def preprocess(train_csv, test_csv, tokenizer, embedding, cache, var_length=False):
+def normal_init(tensor, std):
+    return torch.randn_like(tensor) * std
+
+
+def preprocess(train_csv, test_csv, tokenizer, embedding, cache, unk_std, var_length=False):
     # types of csv columns
     location = './cachedir'
     time_start = time.time()
@@ -32,7 +38,8 @@ def preprocess(train_csv, test_csv, tokenizer, embedding, cache, var_length=Fals
     # embeddings lookup
     print('Embedding lookup...')
     time_start = time.time()
-    text.vocab.load_vectors(MyVectors(embedding, cache=cache))
+    unk_init = partial(normal_init, std=unk_std)
+    text.vocab.load_vectors(MyVectors(embedding, cache=cache, unk_init=unk_init))
     print_duration(time_start, 'Time for embedding lookup: ')
 
     return train, test, text, qid
