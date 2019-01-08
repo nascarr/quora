@@ -46,6 +46,12 @@ def choose_model(text, args):
                            padding_idx=text.vocab.stoi[text.pad_token],
                            hidden_dim=args.hidden_dim,
                            dropout=args.dropout).cuda()
+    if args.model == 'BiLSTMPoolTest':
+        model = BiLSTMPoolTest(text.vocab.vectors,
+                           lstm_layer=args.n_layers,
+                           padding_idx=text.vocab.stoi[text.pad_token],
+                           hidden_dim=args.hidden_dim,
+                           dropout=args.dropout).cuda()
     if args.model == 'BiGRUPool':
         model = BiGRUPool(text.vocab.vectors,
                           lstm_layer=args.n_layers,

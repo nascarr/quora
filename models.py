@@ -185,6 +185,47 @@ class BiLSTMPoolFast(nn.Module):
         return y
 
 
+class BiLSTMPoolTest(nn.Module):
+    # varibale length for sequences in batch,  optimized for performance
+    def __init__(self, pretrained_lm, padding_idx, static=True, hidden_dim=100, lstm_layer=2, dropout=0.2):
+        super(BiLSTMPoolTest, self).__init__()
+        self.hidden_dim = hidden_dim
+        self.num_layers = lstm_layer
+        self.dropout = nn.Dropout(p=dropout)
+        self.embedding = nn.Embedding.from_pretrained(pretrained_lm)
+        self.embedding.padding_idx = padding_idx
+        if static:
+            self.embedding.weight.requires_grad = False
+        self.lstm = nn.LSTM(input_size=self.embedding.embedding_dim,
+                            hidden_size=hidden_dim,
+                            num_layers=lstm_layer,
+                            dropout=dropout,
+                            bidirectional=True)
+        self.hidden2label = nn.Linear(hidden_dim * 6, 1)
+        self.cell = self.lstm
+
+
+    def forward(self, sents, lengths=None):
+        x = self.embedding(sents)
+        x = torch.transpose(x, dim0=1, dim1=0)
+        if lengths is not None:
+            lengths = lengths.view(-1).tolist()
+            packed_x = nn.utils.rnn.pack_padded_sequence(x, lengths)
+        lstm_out, (h_n, c_n) = self.lstm(packed_x)
+        unpacked_out, unpacked_len = nn.utils.rnn.pad_packed_sequence(lstm_out)
+        sl, bs, _ = unpacked_out.shape
+        output_list = [unpacked_out[:l, i, :] for i, l in enumerate(unpacked_len.cpu().numpy())]
+        output = torch.stack([t[-1, :] for t in output_list], dim=1)
+        output = torch.transpose(output, dim0=1, dim1=0)
+        max_pool, _ = torch.max(unpacked_out, 0)
+        average_pool = torch.mean(unpacked_out, 0)
+        long_output = torch.cat((output, max_pool, average_pool), dim=1)
+        #long_output = torch.transpose(long_output, dim0=1, dim1=0)
+        y = self.hidden2label(self.dropout(long_output))
+        return y
+
+
+
 class BiLSTM_2FC(nn.Module):
     def __init__(self, pretrained_lm, padding_idx, static=True, hidden_dim=100, lstm_layer=2, dropout=0.2):
         super(BiLSTM_2FC, self).__init__()
