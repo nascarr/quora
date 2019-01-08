@@ -2,14 +2,29 @@ import torch
 import torch.nn as nn
 
 
-def cut_idxs(lengths):
+def section_sizes(lengths):
+    bs = len(lengths)
     flags = lengths[1:] - lengths[:-1]
-    cuts = torch.nonzero(flags)[0]
-    zero = torch.ze
-    if cuts[-1] == len(lengths) - 1:
-        cuts = torch.cat([0, cuts])
-    else:
-        cuts = torch.cat([0, cuts, len()])
+    cuts = torch.add(torch.nonzero(flags).view(-1), 1)
+    cuts = torch.cat([torch.tensor([0]), cuts, torch.tensor([bs])])
+    sizes = cuts[1:] - cuts[:-1]
+    return sizes
+
+
+def max_packed(x, lengths):
+    cuts = section_sizes(lengths)
+    tensors = torch.split(x, split_size_or_sections=section_sizes(lengths))
+    maxes = [torch.max(t)[0] for t in tensors]
+    result = torch.cat(maxes)
+    return result
+
+
+def mean_packed(x, lengths):
+    cuts = section_sizes(lengths)
+    tensors = torch.split(x, split_size_or_sections=section_sizes(lengths))
+    means = [torch.mean(t) for t in tensors]
+    result = torch.cat(means)
+    return result
 
 
 class BiLSTM(nn.Module):
