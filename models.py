@@ -2,6 +2,15 @@ import torch
 import torch.nn as nn
 
 
+def cut_idxs(lengths):
+    flags = lengths[1:] - lengths[:-1]
+    cuts = torch.nonzero(flags)[0]
+    zero = torch.ze
+    if cuts[-1] == len(lengths) - 1:
+        cuts = torch.cat([0, cuts])
+    else:
+        cuts = torch.cat([0, cuts, len()])
+
 
 class BiLSTM(nn.Module):
     def __init__(self, pretrained_lm, padding_idx, static=True, hidden_dim=100, lstm_layer=2, dropout=0.2):
@@ -140,6 +149,7 @@ class BiLSTMPoolFast(nn.Module):
                             bidirectional=True)
         self.hidden2label = nn.Linear(hidden_dim * 6, 1)
         self.cell = self.lstm
+
 
     def forward(self, sents, lengths=None):
         x = self.embedding(sents)
