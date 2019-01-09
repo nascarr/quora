@@ -48,7 +48,7 @@ class Learner:
         fine_tuning = False
         losses = []
         best_test_info = None
-        torch.backends.cudnn.benchmark = True
+        torch.backends.cudnn.benchmark = False
 
         time_start = time.time()
         for e in range(epoch):
