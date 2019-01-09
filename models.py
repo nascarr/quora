@@ -32,7 +32,16 @@ def mean_packed(x, lengths):
     return mean_tensor
 
 
+def out_max_mean(x):
+    out = x[-1]
+    max_tensor, _ = torch.max(x, 0)
+    mean_tensor = torch.mean(x, 0)
+    return out, max_tensor, mean_tensor
+
+
 def out_max_mean_packed(x, lengths):
+    if lengths[0] == lengths[-1]:
+        return out_max_mean(x)
     sizes, section_lengths = section_sizes_and_lengths(lengths)
     sizes = sizes.cpu().numpy().tolist()
     tensors = torch.split(x, split_size_or_sections=sizes, dim=1)
