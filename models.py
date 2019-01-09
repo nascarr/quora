@@ -2,29 +2,45 @@ import torch
 import torch.nn as nn
 
 
-def section_sizes(lengths):
+def section_sizes_and_lengths(lengths):
     bs = len(lengths)
     flags = lengths[1:] - lengths[:-1]
     cuts = torch.add(torch.nonzero(flags).view(-1), 1)
     cuts = torch.cat([torch.tensor([0]), cuts, torch.tensor([bs])])
+    section_lengths = lengths[cuts[:-1]]
     sizes = cuts[1:] - cuts[:-1]
-    return sizes
+    return sizes, section_lengths
 
 
 def max_packed(x, lengths):
-    cuts = section_sizes(lengths)
-    tensors = torch.split(x, split_size_or_sections=section_sizes(lengths))
-    maxes = [torch.max(t)[0] for t in tensors]
-    result = torch.cat(maxes)
-    return result
+    sizes, section_lengths = section_sizes_and_lengths(lengths)
+    sizes = sizes.cpu().numpy().tolist()
+    tensors = torch.split(x, split_size_or_sections=sizes, dim=1)
+    tensors = [t[:sl] for t, sl in zip(tensors, section_lengths)]
+    maxes = [torch.max(t, 0)[0] for t in tensors]
+    max_tensor = torch.cat(maxes)
+    return max_tensor
 
 
 def mean_packed(x, lengths):
-    cuts = section_sizes(lengths)
-    tensors = torch.split(x, split_size_or_sections=section_sizes(lengths))
-    means = [torch.mean(t) for t in tensors]
-    result = torch.cat(means)
-    return result
+    sizes, section_lengths = section_sizes_and_lengths(lengths)
+    sizes = sizes.cpu().numpy().tolist()
+    tensors = torch.split(x, split_size_or_sections=sizes, dim=1)
+    tensors = [t[:sl] for t, sl in zip(tensors, section_lengths)]
+    means = [torch.mean(t, 0) for t in tensors]
+    mean_tensor = torch.cat(means)
+    return mean_tensor
+
+
+def out_max_mean_packed(x, lengths):
+    sizes, section_lengths = section_sizes_and_lengths(lengths)
+    sizes = sizes.cpu().numpy().tolist()
+    tensors = torch.split(x, split_size_or_sections=sizes, dim=1)
+    tensors = [t[:sl] for t, sl in zip(tensors, section_lengths)]
+    out = torch.cat([t[-1] for t in tensors])
+    max_tensor = torch.cat([torch.max(t, 0)[0] for t in tensors])
+    mean_tensor = torch.cat([torch.mean(t, 0) for t in tensors])
+    return out, max_tensor, mean_tensor
 
 
 class BiLSTM(nn.Module):
@@ -204,7 +220,6 @@ class BiLSTMPoolTest(nn.Module):
         self.hidden2label = nn.Linear(hidden_dim * 6, 1)
         self.cell = self.lstm
 
-
     def forward(self, sents, lengths=None):
         x = self.embedding(sents)
         x = torch.transpose(x, dim0=1, dim1=0)
@@ -213,14 +228,8 @@ class BiLSTMPoolTest(nn.Module):
             packed_x = nn.utils.rnn.pack_padded_sequence(x, lengths)
         lstm_out, (h_n, c_n) = self.lstm(packed_x)
         unpacked_out, unpacked_len = nn.utils.rnn.pad_packed_sequence(lstm_out)
-        sl, bs, _ = unpacked_out.shape
-        output_list = [unpacked_out[:l, i, :] for i, l in enumerate(unpacked_len.cpu().numpy())]
-        output = torch.stack([t[-1, :] for t in output_list], dim=1)
-        output = torch.transpose(output, dim0=1, dim1=0)
-        max_pool, _ = torch.max(unpacked_out, 0)
-        average_pool = torch.mean(unpacked_out, 0)
+        output, max_pool, average_pool = out_max_mean_packed(unpacked_out, unpacked_len)
         long_output = torch.cat((output, max_pool, average_pool), dim=1)
-        #long_output = torch.transpose(long_output, dim0=1, dim1=0)
         y = self.hidden2label(self.dropout(long_output))
         return y
 
