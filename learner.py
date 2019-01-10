@@ -8,7 +8,7 @@ import shutil
 import time
 import subprocess
 import sys
-from utils import f1_metric, print_duration, get_hash, str_date_time, dict_to_csv, save_plot, copy_files, save_plots
+from utils import f1_metric, print_duration, get_hash, str_date_time, dict_to_csv, save_plot, copy_files, save_plots, val_pred_to_csv
 
 
 class Learner:
@@ -130,6 +130,10 @@ class Learner:
         train_loss, train_f1 = self.evaluate(self.train_dl, tresh)
         tr_info = {'train_loss':train_loss, 'train_f1':train_f1}
         self.recorder.append_info(tr_info, message='Train loss and f1:')
+
+        # save val predictions for ensemble
+        y_pred, y_true, ids = self.predict_probs()
+        val_pred_to_csv(ids, y_pred, y_true)
 
 
 
