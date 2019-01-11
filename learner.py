@@ -278,7 +278,7 @@ class Recorder:
         # copy all records to subdir
         png_files = ['val_loss.png', 'val_f1.png'] if not self.args.test else ['loss.png', 'f1.png']
         csv_files = ['val_probs.csv', 'train_steps.csv']
-        copy_files([*png_files, 'models/*.info', 'models/*.m', *csv_files], subdir)
+        copy_files([*png_files, 'models/*.info', *csv_files], subdir)
 
 
 def format_info(info):
