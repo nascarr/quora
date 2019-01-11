@@ -134,7 +134,7 @@ class BiLSTMPoolOld(nn.Module):
 
 
 
-class BiLSTMPool(nn.Module):
+class BiLSTMPoolSlow(nn.Module):
     # variable length for sequences in batch
     def __init__(self, pretrained_lm, padding_idx, static=True, hidden_dim=100, lstm_layer=2, dropout=0.2):
         super(BiLSTMPool, self).__init__()
@@ -210,7 +210,7 @@ class BiLSTMPoolFast(nn.Module):
         return y
 
 
-class BiLSTMPoolTest(nn.Module):
+class BiLSTMPool(nn.Module):
     # varibale length for sequences in batch,  optimized for performance
     def __init__(self, pretrained_lm, padding_idx, static=True, hidden_dim=100, lstm_layer=2, dropout=0.2):
         super(BiLSTMPoolTest, self).__init__()
