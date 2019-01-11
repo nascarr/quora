@@ -17,7 +17,7 @@ class Ensemble:
 
     def __init__(self, models, is_kfold=False):
         self.models = models
-        self.descriptions = [model_dict[m][1] for m in models]
+        self.descriptions = [model_dict[m][1] - 1 for m in models] # office index starts with 1
         self.methods = methods
         if models[0][-4:] == 'test':
             self.record_path = 'notes/test_records.csv'
