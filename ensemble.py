@@ -24,7 +24,9 @@ class Ensemble:
         else:
             self.record_path = 'notes/records.csv'
 
-    def __call__(self, method='mean', tresh=[0.1, 0.5, 0.01]):
+    def __call__(self, args):
+        thresh = args.thresh
+        method = args.method
         preds = []
         last_ids = None
         for m in self.models:
@@ -33,9 +35,9 @@ class Ensemble:
             if last_ids:
                 if last_ids != ids:
                     raise Exception('Prediction ids should be the same for ensemble')
-        final_pred = methods[method](preds)
-        tresh, max_f1 = self.evaluate_ensemble(final_pred, true, tresh)
-        self.record(max_f1, tresh, method)
+        final_pred = methods[method](preds, args)
+        thresh, max_f1 = self.evaluate_ensemble(final_pred, true, thresh)
+        self.record(max_f1, thresh, method)
 
     @staticmethod
     def descr_rows_for_models(models):
@@ -100,7 +102,9 @@ if __name__ == '__main__':
     arg('--models', '-m', nargs='+', type=str)
     arg('-k', action='store_true')
     arg('--method', '-mth', default='mean', type=str, choices=['mean', 'weight', 'stack'])
+    arg('--weights', '-w', nargs='+', default=[0.9, 0.1], type=float)
+    arg('--thresh', '-th', nargs='+', default=[0.1, 0.5, 0.01], type=float)
     args = parser.parse_args()
     ens = Ensemble(args.models, args.k)
-    ens(method=args.method)
+    ens(args)
 
