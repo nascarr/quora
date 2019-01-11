@@ -1,19 +1,19 @@
 #!/usr/bin/env python
 
+import argparse
 import os
-import sys
 import random
+import sys
+
 import torch.nn as nn
 import torch.optim as optim
-import argparse
 
-from preprocess import preprocess, split, iterate
-from tokenizers import WhitespaceTokenizer
 from choose import choose_tokenizer, choose_model, choose_optimizer
-from learner import Learner
-from utils import submit, check_changes_commited
-from ensemble import val_pred_to_csv
 from create_test_datasets import reduce_embedding, reduce_datasets
+from ensemble import val_pred_to_csv
+from learner import Learner, choose_thresh
+from preprocess import preprocess, split, iterate
+from utils import submit, check_changes_commited
 
 
 def parse_script_args():
@@ -132,13 +132,18 @@ def main(args, train_csv, test_csv, embedding, cache):
         eval_every = int(len(list(iter(train_iter))) / args.n_eval)
         learn.fit(args.epoch, eval_every, args.f1_tresh, args.early_stop, args.warmup_epoch, args.clip)
 
+        # load best model
+        learn.model, info = learn.recorder.load()
         # save val predictions
         y_pred, y_true, ids = learn.predict_probs()
         val_ids = [qid.vocab.itos[i] for i in ids]
         val_pred_to_csv(val_ids, y_pred, y_true)
+        # choose best threshold for val predictions
+        best_th, max_f1 = choose_thresh(y_pred, y_true, [0.1, 0.5, 0.01], message=True)
+        learn.recorder.append_info({'best_th': best_th, 'max_f1': max_f1})
+
 
         # predict test labels
-        learn.model, info = learn.recorder.load()
         test_label, _, test_ids, tresh = learn.predict_labels(is_test=True, tresh=args.f1_tresh)
         if args.test:
             test_loss, test_f1 = learn.evaluate(learn.test_dl, args.f1_tresh)

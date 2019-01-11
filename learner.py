@@ -180,24 +180,10 @@ class Learner:
         return y_pred, y_true, ids
 
     def predict_labels(self, is_test=False, tresh=0.5):
-        def _choose_tr(self, min_tr, max_tr, tr_step):
-            val_pred, val_true, _ = self.predict_probs(is_test=False)
-            tmp = [0, 0, 0]  # idx, current_f1, max_f1
-            tr = min_tr
-            for tmp[0] in np.arange(min_tr, max_tr, tr_step):
-                with warnings.catch_warnings():
-                    warnings.simplefilter('ignore')
-                    tmp[1] = f1_score(val_true, np.array(val_pred) > tmp[0])
-                if tmp[1] > tmp[2]:
-                    tr = tmp[0]
-                    tmp[2] = tmp[1]
-            print('Best threshold is {:.4f} with F1 score: {:.4f}'.format(tr, tmp[2]))
-            return tr, tmp[2]
-
         y_pred, y_true, ids = self.predict_probs(is_test=is_test)
 
         if type(tresh) == list:
-            tresh, max_f1 = _choose_tr(self, *tresh)
+            tresh, max_f1 = choose_thresh(y_pred, y_true, *tresh, message=True)
             self.recorder.append_info({'best_tr': tresh, 'best_f1': max_f1})
 
         y_label = (np.array(y_pred) >= tresh).astype(int)
@@ -291,7 +277,7 @@ class Recorder:
 
         # copy all records to subdir
         png_files = ['val_loss.png', 'val_f1.png'] if not self.args.test else ['loss.png', 'f1.png']
-        csv_files = ['val_preds.csv', 'train_steps.csv']
+        csv_files = ['val_probs.csv', 'train_steps.csv']
         copy_files([*png_files, 'models/*.info', 'models/*.m', *csv_files], subdir)
 
 
@@ -303,3 +289,18 @@ def format_info(info):
     return info
 
 
+def choose_thresh(probs, true, thresh_range, message=True):
+    min_th, max_th, th_step = thresh_range
+    tmp = [0, 0, 0]  # idx, current_f1, max_f1
+    th = min_th
+    for tmp[0] in np.arange(min_th, max_th, th_step):
+        with warnings.catch_warnings():
+            warnings.simplefilter('ignore')
+            tmp[1] = f1_score(true, probs > tmp[0])
+        if tmp[1] > tmp[2]:
+            th = tmp[0]
+            tmp[2] = tmp[1]
+    if message:
+        print('Best threshold is {:.4f} with F1 score: {:.4f}'.format(th, tmp[2]))
+
+    return th, tmp[2]
