@@ -137,7 +137,7 @@ class BiLSTMPoolOld(nn.Module):
 class BiLSTMPoolSlow(nn.Module):
     # variable length for sequences in batch
     def __init__(self, pretrained_lm, padding_idx, static=True, hidden_dim=100, lstm_layer=2, dropout=0.2):
-        super(BiLSTMPool, self).__init__()
+        super(BiLSTMPoolSlow, self).__init__()
         self.hidden_dim = hidden_dim
         self.dropout = nn.Dropout(p=dropout)
         self.embedding = nn.Embedding.from_pretrained(pretrained_lm)
@@ -213,7 +213,7 @@ class BiLSTMPoolFast(nn.Module):
 class BiLSTMPool(nn.Module):
     # varibale length for sequences in batch,  optimized for performance
     def __init__(self, pretrained_lm, padding_idx, static=True, hidden_dim=100, lstm_layer=2, dropout=0.2):
-        super(BiLSTMPoolTest, self).__init__()
+        super(BiLSTMPool, self).__init__()
         self.hidden_dim = hidden_dim
         self.num_layers = lstm_layer
         self.dropout = nn.Dropout(p=dropout)
