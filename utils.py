@@ -8,14 +8,6 @@ import glob
 import shutil
 
 
-def val_pred_to_csv(ids, y_pred, y_true, fname='val_probs.csv'):
-    df = pd.DataFrame()
-    df['qid'] = ids
-    df['prediction'] = y_pred
-    df['true'] = y_true
-    df.to_csv(fname, index=False)
-
-
 def submit(test_ids, prediciton, subm_name='submission.csv'):
     sub_df = pd.DataFrame()
     sub_df['qid'] = test_ids

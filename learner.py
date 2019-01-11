@@ -8,7 +8,7 @@ import shutil
 import time
 import subprocess
 import sys
-from utils import f1_metric, print_duration, get_hash, str_date_time, dict_to_csv, save_plot, copy_files, save_plots, val_pred_to_csv
+from utils import f1_metric, print_duration, get_hash, str_date_time, dict_to_csv, save_plot, copy_files, save_plots
 
 
 class Learner:
@@ -131,11 +131,6 @@ class Learner:
         tr_info = {'train_loss':train_loss, 'train_f1':train_f1}
         self.recorder.append_info(tr_info, message='Train loss and f1:')
 
-        # save val predictions for ensemble
-        y_pred, y_true, ids = self.predict_probs()
-        val_pred_to_csv(ids, y_pred, y_true)
-
-
 
     def evaluate(self, dl, tresh):
         with torch.no_grad():
@@ -231,17 +226,9 @@ class Recorder:
         self.norm_record = []
         self.new = True
 
-    @staticmethod
-    def format_info(info):
-        keys = list(info.keys())
-        values = list(info.values())
-        for k, v in zip(keys, values):
-            info[k] = round(v, 4)
-        return info
-
     @classmethod
     def append_info(cls, dict, message=None):
-        dict = cls.format_info(dict)
+        dict = format_info(dict)
         if message:
             print(message, dict)
         info = torch.load(cls.best_info_path)
@@ -251,7 +238,7 @@ class Recorder:
     def save(self, model, info):
         os.makedirs(self.models_dir, exist_ok=True)
         torch.save(model, self.best_model_path)
-        info = self.format_info(info)
+        info = format_info(info)
         torch.save(info, self.best_info_path)
 
     def load(self, message=None):
@@ -303,4 +290,16 @@ class Recorder:
         dict_to_csv(param_dict, self.record_path, 'a', 'columns', reverse=True, header=header)
 
         # copy all records to subdir
-        copy_files(['*.png', 'models/*.info', 'models/*.m', 'train_steps.csv'], subdir)
+        png_files = ['val_loss.png', 'val_f1.png'] if not self.args.test else ['loss.png', 'f1.png']
+        csv_files = ['val_preds.csv', 'train_steps.csv']
+        copy_files([*png_files, 'models/*.info', 'models/*.m', *csv_files], subdir)
+
+
+def format_info(info):
+    keys = list(info.keys())
+    values = list(info.values())
+    for k, v in zip(keys, values):
+        info[k] = round(v, 4)
+    return info
+
+

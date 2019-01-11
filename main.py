@@ -12,6 +12,7 @@ from tokenizers import WhitespaceTokenizer
 from choose import choose_tokenizer, choose_model, choose_optimizer
 from learner import Learner
 from utils import submit, check_changes_commited
+from ensemble import val_pred_to_csv
 from create_test_datasets import reduce_embedding, reduce_datasets
 
 
@@ -131,13 +132,20 @@ def main(args, train_csv, test_csv, embedding, cache):
         eval_every = int(len(list(iter(train_iter))) / args.n_eval)
         learn.fit(args.epoch, eval_every, args.f1_tresh, args.early_stop, args.warmup_epoch, args.clip)
 
+        # save val predictions
+        y_pred, y_true, ids = learn.predict_probs()
+        val_ids = [qid.vocab.itos[i] for i in ids]
+        val_pred_to_csv(val_ids, y_pred, y_true)
+
         # predict test labels
         learn.model, info = learn.recorder.load()
-        test_label, _, test_ids, tresh = learn.predict_labels(is_test=True, tresh = args.f1_tresh)
+        test_label, _, test_ids, tresh = learn.predict_labels(is_test=True, tresh=args.f1_tresh)
         if args.test:
             test_loss, test_f1 = learn.evaluate(learn.test_dl, args.f1_tresh)
             learn.recorder.append_info({'test_loss': test_loss, 'test_f1': test_f1}, message='Test set results: ')
         learn.recorder.record(fold)
+
+    # save test predictions to submission.csv
     test_ids = [qid.vocab.itos[i] for i in test_ids]
     submit(test_ids, test_label)
 
