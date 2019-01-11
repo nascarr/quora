@@ -17,4 +17,4 @@ notebooks/.ipynb_checkpoints
 *.sh
 **/.pytest_cache
 *.ipynb
-
+**/notebooks
