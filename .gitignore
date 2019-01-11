@@ -16,3 +16,5 @@ notebooks/.ipynb_checkpoints
 *.png
 *.sh
 **/.pytest_cache
+*.ipynb
+
