@@ -119,7 +119,7 @@ class MyVectors(Vectors):
 
             logger.info("Loading vectors from {}".format(path))
 
-            itos, vectors = read_emb(path)
+            itos, vectors, dim = read_emb(path)
 
             self.itos = itos
             self.stoi = {word: i for i, word in enumerate(itos)}
@@ -137,10 +137,10 @@ class MyVectors(Vectors):
 def read_emb(path):
     ext = os.path.splitext(path)[1][1:]
     if ext == 'bin':
-        itos, vectors = emb_from_bin(path)
+        itos, vectors, dim = emb_from_bin(path)
     else:
-        itos, vectors = emb_from_txt(path, ext)
-    return itos, vectors
+        itos, vectors, dim = emb_from_txt(path, ext)
+    return itos, vectors, dim
 
 
 def emb_from_txt(path, ext):
@@ -190,4 +190,12 @@ def emb_from_txt(path, ext):
             if vectors_loaded == max_vectors:
                 break
 
-    return itos, vectors
+    return itos, vectors, dim
+
+
+def emb_from_bin(path):
+    emb_index = KeyedVectors.load_word2vec_format(path, binary=True)
+    itos = emb_index.index2word
+    vectors = emb_index.vectors
+    dim = emb_index.vector_size
+    return itos, vectors, dim
