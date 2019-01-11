@@ -17,7 +17,7 @@ class Ensemble:
 
     def __init__(self, models, is_kfold=False):
         self.models = models
-        self.descriptions = [model_dict[m][1] - 1 for m in models] # office index starts with 1
+        self.descr_rows = self.descr_rows_for_models(models) # office index starts with 1
         self.methods = methods
         if models[0][-4:] == 'test':
             self.record_path = 'notes/test_records.csv'
@@ -38,6 +38,12 @@ class Ensemble:
         self.record(max_f1, tresh, method)
 
     @staticmethod
+    def descr_rows_for_models(models):
+        value_rows = [model_dict[m][1] - 1 for m in models]
+        header_rows = [r - 1 for r in value_rows]
+        return value_rows + header_rows
+
+    @staticmethod
     def evaluate_ensemble(final_pred, true, thresh):
         if type(thresh) == float:
             f1 = f1_score(true, final_pred > thresh)
@@ -52,12 +58,12 @@ class Ensemble:
     def record(self, max_f1, tresh, method):
         info = format_info({'max_f1': max_f1, 'tresh': tresh})
         info = {'method': method, **info}
-        model_descrps = []
+        model_descrps = ['']
         # copy partial models descriptions
         with open(self.record_path, 'r') as f:
             reader = csv.reader(f)
             for idx, row in enumerate(reader):
-                if idx in self.descriptions:
+                if idx in self.descr_rows:
                     model_descrps.append(row)
         with open(self.ens_record_path, 'a') as f:
             writer = csv.writer(f)
