@@ -54,7 +54,11 @@ class GNewsTokenizer(object):
         self.add_stopwords(GNEWS_STOP_WORDS)
 
     def __call__(self, x):
-        return [tok.text.lower() for tok in self.tokenizer(x) if not tok.is_stop]
+        result = [tok.text for tok in self.tokenizer(x) if not tok.is_stop]
+        if len(result) == 0:
+            return ['<zero_length>']
+        else:
+            return result
 
     def remove_all_stopwords(self):
         spacy_stopwords = spacy.lang.en.stop_words.STOP_WORDS

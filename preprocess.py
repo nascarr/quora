@@ -14,6 +14,12 @@ def normal_init(tensor, std):
     return torch.randn_like(tensor) * std
 
 
+def nonzero_length(x):
+    if len(x) == 0:
+        print('blablabla')
+        return ['<zero_length>']
+
+
 def preprocess(train_csv, test_csv, tokenizer, embedding, cache, unk_std, var_length=False):
     # types of csv columns
     location = './cachedir'
