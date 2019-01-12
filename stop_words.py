@@ -1,0 +1,1 @@
+GNEWS_STOP_WORDS = set("""? to a of and , . " - ) ( / ' : ! [ ] ... ; { } .. < > '' """.split())

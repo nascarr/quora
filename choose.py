@@ -11,6 +11,8 @@ def choose_tokenizer(tokenizer):
         return CustomTokenizer()
     elif tokenizer == 'lowerspacy':
         return LowerSpacy()
+    elif tokenizer == 'gnews':
+        return GNewsTokenizer()
     else:
         return tokenizer
 
