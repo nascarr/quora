@@ -99,7 +99,7 @@ def load_pred_from_csv(m):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     arg = parser.add_argument
-    arg('--models', '-m', nargs='+', type=str)
+    arg('--models', '-m', nargs='+', type=str, default=['glove', 'wnews', 'paragram', 'gnews'])
     arg('-k', action='store_true')
     arg('--method', '-mth', default='mean', type=str, choices=['mean', 'weight', 'stack'])
     arg('--weights', '-w', nargs='+', default=[0.9, 0.1], type=float)
