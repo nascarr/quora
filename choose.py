@@ -1,6 +1,6 @@
 # functions for choosing tokenizer, optimizer and model
 from tokenizers import *
-from models import *
+import models
 import torch.optim as optim
 
 
@@ -15,69 +15,12 @@ def choose_tokenizer(tokenizer):
         return tokenizer
 
 
-def choose_model(text, args):
-    if args.model == 'BiLSTM':
-        model = BiLSTM(text.vocab.vectors,
-                       lstm_layer=args.n_layers,
+def choose_model(model_name, text, n_layers, hidden_dim, dropout):
+    model = getattr(models, model_name)(text.vocab.vectors,
+                       lstm_layer=n_layers,
                        padding_idx=text.vocab.stoi[text.pad_token],
-                       hidden_dim=args.hidden_dim,
-                       dropout=args.dropout).cuda()
-    if args.model == 'BiGRU':
-        model = BiGRU(text.vocab.vectors,
-                      lstm_layer=args.n_layers,
-                      padding_idx=text.vocab.stoi[text.pad_token],
-                      hidden_dim=args.hidden_dim,
-                      dropout=args.dropout).cuda()
-    if args.model == 'BiLSTMPool':
-        model = BiLSTMPool(text.vocab.vectors,
-                           lstm_layer=args.n_layers,
-                           padding_idx=text.vocab.stoi[text.pad_token],
-                           hidden_dim=args.hidden_dim,
-                           dropout=args.dropout).cuda()
-    if args.model == 'BiLSTMPoolOld':
-        model = BiLSTMPoolOld(text.vocab.vectors,
-                           lstm_layer=args.n_layers,
-                           padding_idx=text.vocab.stoi[text.pad_token],
-                           hidden_dim=args.hidden_dim,
-                           dropout=args.dropout).cuda()
-    if args.model == 'BiLSTMPoolFast':
-        model = BiLSTMPoolFast(text.vocab.vectors,
-                           lstm_layer=args.n_layers,
-                           padding_idx=text.vocab.stoi[text.pad_token],
-                           hidden_dim=args.hidden_dim,
-                           dropout=args.dropout).cuda()
-    if args.model == 'BiLSTMPoolTest':
-        model = BiLSTMPoolTest(text.vocab.vectors,
-                           lstm_layer=args.n_layers,
-                           padding_idx=text.vocab.stoi[text.pad_token],
-                           hidden_dim=args.hidden_dim,
-                           dropout=args.dropout).cuda()
-    if args.model == 'BiGRUPool':
-        model = BiGRUPool(text.vocab.vectors,
-                          lstm_layer=args.n_layers,
-                          padding_idx=text.vocab.stoi[text.pad_token],
-                          hidden_dim=args.hidden_dim,
-                          dropout=args.dropout).cuda()
-    if args.model == 'BiLSTM_2FC':
-        model = BiLSTM_2FC(text.vocab.vectors,
-                           lstm_layer=args.n_layers,
-                           padding_idx=text.vocab.stoi[text.pad_token],
-                           hidden_dim=args.hidden_dim,
-                           dropout=args.dropout).cuda()
-
-    if args.model == 'BiGRUPool_2FC':
-        model = BiGRUPool_2FC(text.vocab.vectors,
-                              lstm_layer=args.n_layers,
-                              padding_idx=text.vocab.stoi[text.pad_token],
-                              hidden_dim=args.hidden_dim,
-                              dropout=args.dropout).cuda()
-
-    if args.model == 'BiLSTMPool_2FC':
-        model = BiLSTMPool_2FC(text.vocab.vectors,
-                               lstm_layer=args.n_layers,
-                               padding_idx=text.vocab.stoi[text.pad_token],
-                               hidden_dim=args.hidden_dim,
-                               dropout=args.dropout).cuda()
+                       hidden_dim=hidden_dim,
+                       dropout=dropout).cuda()
     return model
 
 
