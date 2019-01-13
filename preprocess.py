@@ -14,50 +14,54 @@ def normal_init(tensor, std):
     return torch.randn_like(tensor) * std
 
 
-def nonzero_length(x):
-    if len(x) == 0:
-        print('blablabla')
-        return ['<zero_length>']
+class Data:
+    def __init__(self, train_csv, test_csv):
+        self.test_csv = test_csv
+        self.train_csv = train_csv
+        self.text = None
+        self.qid = None
+        self.train = None
+        self.test = None
+        self.target = None
 
+    def preprocess(self, tokenizer, var_length=False):
+        # types of csv columns
+        time_start = time.time()
+        self.text = data.Field(batch_first=True, tokenize=tokenizer, include_lengths=var_length)
+        self.qid = data.Field()
+        self.target = data.Field(sequential=False, use_vocab=False, is_target=True)
 
-def preprocess(train_csv, test_csv, tokenizer, embedding, cache, unk_std, var_length=False):
-    # types of csv columns
-    location = './cachedir'
-    time_start = time.time()
-    text = data.Field(batch_first=True, tokenize=tokenizer, include_lengths=var_length)
-    qid = data.Field()
-    target = data.Field(sequential=False, use_vocab=False, is_target=True)
+        # read and tokenize data
+        print('Read and tokenize data')
+        self.train = MyTabularDataset(path=train_csv, format='csv',
+                                 fields={'qid': ('qid', self.qid),
+                                         'question_text': ('text', self.text),
+                                         'target': ('target', self.target)})
+        self.test = MyTabularDataset(path=test_csv, format='csv',
+                                fields={'qid': ('qid', self.qid),
+                                        'question_text': ('text', self.text)})
+        self.text.build_vocab(self.train, self.test, min_freq=1)
+        self.qid.build_vocab(self.train, self.test)
+        print_duration(time_start, 'Time to read and tokenize data: ')
+        return self.text, self.qid
 
-    # read and tokenize data
-    print('Reading data.')
-    train = MyTabularDataset(path=train_csv, format='csv',
-                             fields={'qid': ('qid', qid),
-                                     'question_text': ('text', text),
-                                     'target': ('target', target)})
-    test = MyTabularDataset(path=test_csv, format='csv',
-                            fields={'qid': ('qid', qid),
-                                    'question_text': ('text', text)})
-    text.build_vocab(train, test, min_freq=1)
-    qid.build_vocab(train, test)
-    print_duration(time_start, 'Time to read and tokenize data: ')
+    def embedding_lookup(self, embedding, cache, unk_std):
+        print('Embedding lookup')
+        time_start = time.time()
+        unk_init = partial(normal_init, std=unk_std)
+        self.text.vocab.load_vectors(MyVectors(embedding, cache=cache, unk_init=unk_init))
+        print_duration(time_start, 'Time for embedding lookup: ')
+        return
 
-    # embeddings lookup
-    print('Embedding lookup...')
-    time_start = time.time()
-    unk_init = partial(normal_init, std=unk_std)
-    text.vocab.load_vectors(MyVectors(embedding, cache=cache, unk_init=unk_init))
-    print_duration(time_start, 'Time for embedding lookup: ')
-
-    return train, test, text, qid
-
-
-def split(train, args):
-    k = args.kfold
-    if k:
-        data_iter = train.split_kfold(k, is_test=args.test, random_state=random.getstate())
-    else:
-        data_iter = train.split(args.split_ratio, random_state=random.getstate())
-    return data_iter
+    def split(self, args):
+        k = args.kfold
+        sr = args.split_ratio
+        is_test = args.is_test
+        if k:
+            data_iter = self.train.split_kfold(k, is_test=is_test, random_state=random.getstate())
+        else:
+            data_iter = self.train.split(sr, random_state=random.getstate())
+        return data_iter
 
 
 def iterate(train, val, test, batch_size):
