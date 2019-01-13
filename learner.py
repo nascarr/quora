@@ -37,7 +37,7 @@ class Learner:
         else:
             return [data.cuda(), None]
 
-    def fit(self, epoch, eval_every, tresh, early_stop, warmup_epoch, clip):
+    def fit(self, epoch, n_eval, tresh, early_stop, warmup_epoch, clip):
 
         step = 0
         min_loss = 1e5
@@ -49,6 +49,7 @@ class Learner:
         losses = []
         best_test_info = None
         torch.backends.cudnn.benchmark = False
+        eval_every = int(len(list(iter(self.train_dl))) / n_eval)
 
         time_start = time.time()
         for e in range(epoch):

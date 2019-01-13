@@ -12,7 +12,7 @@ from choose import choose_tokenizer, choose_model, choose_optimizer
 from create_test_datasets import reduce_embedding, reduce_datasets
 from ensemble import val_pred_to_csv
 from learner import Learner, choose_thresh
-from preprocess import preprocess, split, iterate
+from preprocess import Data, iterate
 from utils import submit, check_changes_commited
 
 
@@ -106,31 +106,38 @@ def analyze_args(args):
 
 
 def main(args, train_csv, test_csv, embedding, cache):
+    """ Main function. Reads data, makes preprocessing, trains model and records results.
+        Gets args as argument and passes values of it's fields to functions."""
+
+    data = Data(train_csv, test_csv)
+
+    # read and preprocess data
     tokenizer = choose_tokenizer(args.tokenizer)
-    train, test, text, qid = preprocess(train_csv, test_csv, tokenizer, embedding, cache, args.unk_std, args.var_length)
+    data.preprocess(tokenizer, args.var_length)
+    data.embedding_lookup(args.embedding, args.unk_std, args.cache)
+
     # split train dataset
-    random.seed(args.seed)
-    data_iter = split(train, args)
+    data_iter = data.split(args.kfold, args.split_ratio, args.is_test, args.seed)
 
     # iterate through folds
     for fold, d in enumerate(data_iter):
-        print(f'========== Fold {fold} ==========')
+        print(f'__________ fold {fold} __________')
+
         # get dataloaders
         if len(d) == 2:
             train, val = d
+            test = data.test
         else:
             train, val, test = d
-        train_iter, val_iter, test_iter = iterate(train, val, test, args.batch_size)
-        dataloaders = train_iter, val_iter, test_iter
+        dataloaders = iterate(train, val, test, args.batch_size) # train, val and test dataloader
 
         # choose model, optimizer, lr scheduler and loss function
-        model = choose_model(text, args)
+        model = choose_model(data.text, args)
         optimizer = choose_optimizer(filter(lambda p: p.requires_grad, model.parameters()), args)
         scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=args.lrstep, gamma=0.1)
         loss_function = nn.BCEWithLogitsLoss()
         learn = Learner(model, dataloaders, loss_function, optimizer, scheduler, args)
-        eval_every = int(len(list(iter(train_iter))) / args.n_eval)
-        learn.fit(args.epoch, eval_every, args.f1_tresh, args.early_stop, args.warmup_epoch, args.clip)
+        learn.fit(args.epoch, args.n_eval, args.f1_tresh, args.early_stop, args.warmup_epoch, args.clip)
 
         # load best model
         learn.model, info = learn.recorder.load()

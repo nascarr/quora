@@ -43,9 +43,9 @@ class Data:
         self.text.build_vocab(self.train, self.test, min_freq=1)
         self.qid.build_vocab(self.train, self.test)
         print_duration(time_start, 'Time to read and tokenize data: ')
-        return self.text, self.qid
 
-    def embedding_lookup(self, embedding, cache, unk_std):
+
+    def embedding_lookup(self, embedding, unk_std, cache):
         print('Embedding lookup')
         time_start = time.time()
         unk_init = partial(normal_init, std=unk_std)
@@ -53,14 +53,12 @@ class Data:
         print_duration(time_start, 'Time for embedding lookup: ')
         return
 
-    def split(self, args):
-        k = args.kfold
-        sr = args.split_ratio
-        is_test = args.is_test
-        if k:
-            data_iter = self.train.split_kfold(k, is_test=is_test, random_state=random.getstate())
+    def split(self, kfold, split_ratio, is_test, seed):
+        random.seed(seed)
+        if kfold:
+            data_iter = self.train.split_kfold(kfold, is_test=is_test, random_state=random.getstate())
         else:
-            data_iter = self.train.split(sr, random_state=random.getstate())
+            data_iter = self.train.split(split_ratio, random_state=random.getstate())
         return data_iter
 
 
