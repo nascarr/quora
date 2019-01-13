@@ -46,7 +46,7 @@ class CustomTokenizer(object):
         return tokens
 
 
-class GNewsTokenizer(object):
+class GNewsTokenizerSW(object):
     def __init__(self):
         self.spacy_en = spacy.load('en')
         self.tokenizer = self.spacy_en.tokenizer
@@ -70,3 +70,20 @@ class GNewsTokenizer(object):
         for w in custom_stop_words:
             lexeme = self.spacy_en.vocab[w]
             lexeme.is_stop = True
+
+
+class GNewsTokenizerNum(object):
+    def __init__(self):
+        self.spacy_en = spacy.load('en')
+        self.tokenizer = self.spacy_en.tokenizer
+        self.num_symb_re = re.compile('^[^a-zA-Z]*[0-9]+[^a-zA-Z]*$')
+        self.sub_re = re.compile('[0-9]')
+
+    def tokenize_numbers(self, tok):
+        if self.num_symb_re.match(tok) and len(tok) > 1:
+            tok = self.sub_re.sub('#', tok)
+        return tok
+
+    def __call__(self, x):
+        return [self.tokenize_numbers(tok.text) for tok in self.tokenizer(x)]
+
