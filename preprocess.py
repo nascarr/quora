@@ -32,25 +32,25 @@ class Data:
         self.target = data.Field(sequential=False, use_vocab=False, is_target=True)
 
         # read and tokenize data
-        print('Read and tokenize data')
-        self.train = MyTabularDataset(path=train_csv, format='csv',
+        print('read and tokenize data...')
+        self.train = MyTabularDataset(path=self.train_csv, format='csv',
                                  fields={'qid': ('qid', self.qid),
                                          'question_text': ('text', self.text),
                                          'target': ('target', self.target)})
-        self.test = MyTabularDataset(path=test_csv, format='csv',
+        self.test = MyTabularDataset(path=self.test_csv, format='csv',
                                 fields={'qid': ('qid', self.qid),
                                         'question_text': ('text', self.text)})
         self.text.build_vocab(self.train, self.test, min_freq=1)
         self.qid.build_vocab(self.train, self.test)
-        print_duration(time_start, 'Time to read and tokenize data: ')
+        print_duration(time_start, 'time to read and tokenize data: ')
 
 
     def embedding_lookup(self, embedding, unk_std, cache):
-        print('Embedding lookup')
+        print('embedding lookup...')
         time_start = time.time()
         unk_init = partial(normal_init, std=unk_std)
         self.text.vocab.load_vectors(MyVectors(embedding, cache=cache, unk_init=unk_init))
-        print_duration(time_start, 'Time for embedding lookup: ')
+        print_duration(time_start, 'time for embedding lookup: ')
         return
 
     def split(self, kfold, split_ratio, is_test, seed):

@@ -118,19 +118,19 @@ class Learner:
                          #       max_test_f1 = test_f1
                          #       best_test_info = test_info
 
-        tr_time = print_duration(time_start, 'Training time: ')
+        tr_time = print_duration(time_start, 'training time: ')
         self.recorder.append_info({'ep_time': tr_time/(e + 1)})
 
         #if self.args.test:
         #    self.recorder.append_info(best_test_info, message='Best results for test:')
-        self.recorder.append_info({'min_loss': min_loss}, 'Min val loss: ')
+        self.recorder.append_info({'min_loss': min_loss}, 'min val loss: ')
 
-        self.model, info = self.recorder.load(message = 'Best model:')
+        self.model, info = self.recorder.load(message = 'best model:')
 
         # final train evaluation
         train_loss, train_f1 = self.evaluate(self.train_dl, tresh)
         tr_info = {'train_loss':train_loss, 'train_f1':train_f1}
-        self.recorder.append_info(tr_info, message='Train loss and f1:')
+        self.recorder.append_info(tr_info, message='train loss and f1:')
 
 
     def evaluate(self, dl, tresh):
@@ -159,10 +159,10 @@ class Learner:
 
     def predict_probs(self, is_test=False):
         if is_test:
-            print('Predicting test dataset...')
+            print('predicting test dataset...')
             dl = self.test_dl
         else:
-            print('Predicting validation dataset...')
+            print('predicting validation dataset...')
             dl = self.val_dl
 
         self.model.cell.flatten_parameters()
@@ -302,6 +302,6 @@ def choose_thresh(probs, true, thresh_range, message=True):
             th = tmp[0]
             tmp[2] = tmp[1]
     if message:
-        print('Best threshold is {:.4f} with F1 score: {:.4f}'.format(th, tmp[2]))
+        print('best threshold is {:.4f} with F1 score: {:.4f}'.format(th, tmp[2]))
 
     return th, tmp[2]

@@ -114,15 +114,15 @@ def main(args, train_csv, test_csv, embedding, cache):
     # read and preprocess data
     tokenizer = choose_tokenizer(args.tokenizer)
     data.preprocess(tokenizer, args.var_length)
-    data.embedding_lookup(args.embedding, args.unk_std, args.cache)
+    data.embedding_lookup(embedding, args.unk_std, cache)
 
     # split train dataset
-    data_iter = data.split(args.kfold, args.split_ratio, args.is_test, args.seed)
+    data_iter = data.split(args.kfold, args.split_ratio, args.test, args.seed)
 
     # iterate through folds
+    loss_function = nn.BCEWithLogitsLoss()
     for fold, d in enumerate(data_iter):
-        print(f'__________ fold {fold} __________')
-
+        print(f'\n__________ fold {fold} __________')
         # get dataloaders
         if len(d) == 2:
             train, val = d
@@ -131,11 +131,10 @@ def main(args, train_csv, test_csv, embedding, cache):
             train, val, test = d
         dataloaders = iterate(train, val, test, args.batch_size) # train, val and test dataloader
 
-        # choose model, optimizer, lr scheduler and loss function
-        model = choose_model(data.text, args)
+        # choose model, optimizer, lr scheduler
+        model = choose_model(args.model, data.text, args.n_layers, args.hidden_dim, args.dropout)
         optimizer = choose_optimizer(filter(lambda p: p.requires_grad, model.parameters()), args)
         scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=args.lrstep, gamma=0.1)
-        loss_function = nn.BCEWithLogitsLoss()
         learn = Learner(model, dataloaders, loss_function, optimizer, scheduler, args)
         learn.fit(args.epoch, args.n_eval, args.f1_tresh, args.early_stop, args.warmup_epoch, args.clip)
 
@@ -143,7 +142,7 @@ def main(args, train_csv, test_csv, embedding, cache):
         learn.model, info = learn.recorder.load()
         # save val predictions
         y_pred, y_true, ids = learn.predict_probs()
-        val_ids = [qid.vocab.itos[i] for i in ids]
+        val_ids = [data.qid.vocab.itos[i] for i in ids]
         val_pred_to_csv(val_ids, y_pred, y_true)
         # choose best threshold for val predictions
         best_th, max_f1 = choose_thresh(y_pred, y_true, [0.1, 0.5, 0.01], message=True)
@@ -158,8 +157,9 @@ def main(args, train_csv, test_csv, embedding, cache):
         learn.recorder.record(fold)
 
     # save test predictions to submission.csv
-    test_ids = [qid.vocab.itos[i] for i in test_ids]
+    test_ids = [data.qid.vocab.itos[i] for i in test_ids]
     submit(test_ids, test_label)
+    print('\n')
 
 
 if __name__ == '__main__':

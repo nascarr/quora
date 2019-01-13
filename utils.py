@@ -14,7 +14,7 @@ def submit(test_ids, prediciton, subm_name='submission.csv'):
     sub_df['prediction'] = prediciton
     sub_df.to_csv(subm_name, index=False)
 
-    print('Predictions saved in submission.csv file')
+    print('predictions saved in submission.csv file')
 
 
 def f1_metric(tp, n_targs, n_preds):
