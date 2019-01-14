@@ -17,9 +17,8 @@ def _submit(test_ids, predictoins, subm_name):
 
 def submit(test_ids, labels, probs, subm_name='submission.csv'):
     _submit(test_ids, labels, subm_name)
-    subm_probs_name = subm_name[:-4] + '_probs' + '.csv'  # submission_probs.csv
-    _submit(test_ids, probs, subm_probs_name)
-    print(f'predictions saved in {subm_name}, {subm_probs_name} file')
+    _submit(test_ids, probs, 'test_probs.csv')
+    print(f'predictions saved in {subm_name}, test_probs.csv file')
 
 
 def f1_metric(tp, n_targs, n_preds):

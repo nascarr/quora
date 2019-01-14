@@ -8,7 +8,7 @@ import csv
 from learner import format_info, choose_thresh
 from ens_methods import methods
 from sklearn.metrics import f1_score
-from utils import dict_to_csv
+from utils import dict_to_csv, submit
 
 
 class Ensemble:
@@ -22,6 +22,8 @@ class Ensemble:
     def __call__(self, args):
         thresh = args.thresh
         method = args.method
+
+        # find best method parameters based on validation data
         y_preds = []
         last_ids = None
         for pp in self.pred_paths:
@@ -30,9 +32,23 @@ class Ensemble:
             if last_ids:
                 if last_ids != ids:
                     raise Exception('Prediction ids should be the same for ensemble')
-        ens_prob = methods[method](y_preds, args) # target probability after ensembling
-        thresh, max_f1 = self.evaluate_ensemble(ens_prob, y_true, thresh)
+        val_ens_prob = methods[method](y_preds, args) # target probability after ensembling
+        thresh, max_f1 = self.evaluate_ensemble(val_ens_prob, y_true, thresh)
         self.record(max_f1, thresh, method)
+
+        # predict test labels and save submission
+        y_preds = []
+        last_ids = None
+        for pp in self.pred_paths:
+            ids, y_prob = load_pred_from_csv(pp, is_label=False)
+            y_preds.append(y_prob)
+            if last_ids:
+                if last_ids != ids:
+                    raise Exception('Prediction ids should be the same for ensemble')
+        test_ens_prob = methods[method](y_preds, args)  # target probability after ensembling
+        test_ens_label = (test_ens_prob > thresh).astype(int)
+        submit(ids, test_ens_label, test_ens_prob)
+
 
     @staticmethod
     def evaluate_ensemble(final_pred, true, thresh):
@@ -98,13 +114,13 @@ def get_pred_dir(m, model_args='names'):
     return path
 
 
-def load_pred_from_csv(pred_path):
+def load_pred_from_csv(pred_path, is_label=True):
     df = pd.read_csv(pred_path)
     qid = df['qid']
     probs = df['prediction']
-    true = df['true_label']
-    qid, probs, true = [d.values for d in [qid, probs, true]]
-    return qid, probs, true
+    true = df['true_label'] if is_label else None
+    column_values = [d.values for d in [qid, probs, true] if d is not None]
+    return column_values
 
 
 def ens_parser(add_help=True):
