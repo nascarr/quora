@@ -29,7 +29,6 @@ class Data:
     def preprocess(self, tokenizer_name, var_length=False):
         # types of csv columns
         time_start = time.time()
-        dump_path = os.path.join(self.cache, tokenizer_name)
         tokenizer = choose_tokenizer(tokenizer_name)
         self.text = data.Field(batch_first=True, tokenize=tokenizer, include_lengths=var_length)
         self.qid = data.Field()
@@ -41,10 +40,10 @@ class Data:
                                  fields={'qid': ('qid', self.qid),
                                          'question_text': ('text', self.text),
                                          'target': ('target', self.target)})
+
         self.test = MyTabularDataset(path=self.test_csv, format='csv',
                                 fields={'qid': ('qid', self.qid),
                                         'question_text': ('text', self.text)})
-        print_duration(time_start, 'time to read and tokenize data: ')
         self.text.build_vocab(self.train, self.test, min_freq=1)
         self.qid.build_vocab(self.train, self.test)
         print_duration(time_start, 'time to read and tokenize data: ')

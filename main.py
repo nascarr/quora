@@ -156,17 +156,20 @@ def job(args, train_csv, test_csv, embedding, cache):
         if args.test:
             test_loss, test_f1 = learn.evaluate(learn.test_dl, args.f1_tresh)
             learn.recorder.append_info({'test_loss': test_loss, 'test_f1': test_f1}, message='Test set results: ')
-        learn.recorder.record(fold)
+        record_path = learn.recorder.record(fold) # directory path with all records
 
     # save test predictions to submission.csv
     test_ids = [data.qid.vocab.itos[i] for i in test_ids]
     submit(test_ids, test_label)
     print('\n')
+    return record_path
 
 def main(main_args=None):
     args = parse_main_args(main_args)
     train_csv, test_csv, emb_path, cache = analyze_args(args)
-    job(args, train_csv, test_csv, emb_path, cache)
+    record_path = job(args, train_csv, test_csv, emb_path, cache)
+    return record_path
+
 
 if __name__ == '__main__':
     main()
