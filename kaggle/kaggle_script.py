@@ -1328,13 +1328,13 @@ def parse_main_args(main_args=None):
 
     # training params
     arg('--optim', '-o', default='Adam', choices=['Adam', 'AdamW'])
-    arg('--epoch', '-e', default=7, type=int)
+    arg('--epoch', '-e', default=8, type=int)
     arg('--lr', '-lr', default=1e-3, type=float)
     arg('--lrstep', default=[3], nargs='+', type=int) # steps when lr multiplied by 0.1
     arg('--batch_size', '-bs', default=512, type=int)
     arg('--n_eval', '-ne', default=1, type=int, help='Number of validation set evaluations during 1 epoch')
     arg('--warmup_epoch', '-we', default=2, type=int, help='Number of epochs without fine tuning')
-    arg('--early_stop', '-es', default=1, type=int, help='Stop training if no improvement during this number of epochs')
+    arg('--early_stop', '-es', default=2, type=int, help='Stop training if no improvement during this number of epochs')
     arg('--f1_tresh', '-ft', default=0.335, type=float)
     arg('--clip', type=float, default=1, help='gradient clipping')
 
@@ -1343,7 +1343,7 @@ def parse_main_args(main_args=None):
                                                     'BiGRUPool_2FC', 'BiLSTMPool_2FC', 'BiLSTMPoolFast', 'BiLSTMPoolOld',
                                                     'BiLSTMPoolTest'])
     arg('--n_layers', '-n', default=2, type=int, help='Number of layers in model')
-    arg('--hidden_dim', '-hd', type=int, default=100)
+    arg('--hidden_dim', '-hd', type=int, default=150)
     arg('--dropout', '-d', type=float, default=0.2)
 
     if main_args:
