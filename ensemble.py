@@ -96,7 +96,7 @@ def load_pred_from_csv(m):
     return qid, probs, true
 
 
-if __name__ == '__main__':
+def parse_ens_args():
     parser = argparse.ArgumentParser()
     arg = parser.add_argument
     arg('--models', '-m', nargs='+', type=str, default=['glove', 'wnews', 'paragram', 'gnews'])
@@ -105,6 +105,10 @@ if __name__ == '__main__':
     arg('--weights', '-w', nargs='+', default=[0.9, 0.1], type=float)
     arg('--thresh', '-th', nargs='+', default=[0.1, 0.5, 0.01], type=float)
     args = parser.parse_args()
+    return args
+
+if __name__ == '__main__':
+    args = parse_ens_args()
     ens = Ensemble(args.models, args.k)
     ens(args)
 

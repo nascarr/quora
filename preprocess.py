@@ -1,13 +1,14 @@
-import torchtext.data as data
-import torchtext.vocab as vocab
 import torch
 import time
 import random
-import numpy as np
-from tokenizers import WhitespaceTokenizer, CustomTokenizer
+import pickle
+import os
+from functools import partial
+import torchtext.data as data
+
 from utils import print_duration
 from my_torchtext import MyTabularDataset, MyVectors
-from functools import partial
+from choose import choose_tokenizer
 
 
 def normal_init(tensor, std):
@@ -15,18 +16,21 @@ def normal_init(tensor, std):
 
 
 class Data:
-    def __init__(self, train_csv, test_csv):
+    def __init__(self, train_csv, test_csv, cache):
         self.test_csv = test_csv
         self.train_csv = train_csv
+        self.cache = cache
         self.text = None
         self.qid = None
         self.train = None
         self.test = None
         self.target = None
 
-    def preprocess(self, tokenizer, var_length=False):
+    def preprocess(self, tokenizer_name, var_length=False):
         # types of csv columns
         time_start = time.time()
+        dump_path = os.path.join(self.cache, tokenizer_name)
+        tokenizer = choose_tokenizer(tokenizer_name)
         self.text = data.Field(batch_first=True, tokenize=tokenizer, include_lengths=var_length)
         self.qid = data.Field()
         self.target = data.Field(sequential=False, use_vocab=False, is_target=True)
@@ -40,16 +44,17 @@ class Data:
         self.test = MyTabularDataset(path=self.test_csv, format='csv',
                                 fields={'qid': ('qid', self.qid),
                                         'question_text': ('text', self.text)})
+        print_duration(time_start, 'time to read and tokenize data: ')
         self.text.build_vocab(self.train, self.test, min_freq=1)
         self.qid.build_vocab(self.train, self.test)
         print_duration(time_start, 'time to read and tokenize data: ')
 
 
-    def embedding_lookup(self, embedding, unk_std, cache):
+    def embedding_lookup(self, embedding, unk_std):
         print('embedding lookup...')
         time_start = time.time()
         unk_init = partial(normal_init, std=unk_std)
-        self.text.vocab.load_vectors(MyVectors(embedding, cache=cache, unk_init=unk_init))
+        self.text.vocab.load_vectors(MyVectors(embedding, cache=self.cache, unk_init=unk_init))
         print_duration(time_start, 'time for embedding lookup: ')
         return
 

@@ -16,7 +16,7 @@ from preprocess import Data, iterate
 from utils import submit, check_changes_commited
 
 
-def parse_script_args():
+def parse_main_args(main_args=None):
     parser = argparse.ArgumentParser()
     arg = parser.add_argument
 
@@ -53,7 +53,10 @@ def parse_script_args():
     arg('--hidden_dim', '-hd', type=int, default=100)
     arg('--dropout', '-d', type=float, default=0.2)
 
-    args = parser.parse_args()
+    if main_args:
+        args = parser.parse_args(main_args)
+    else:
+        args = parser.parse_args()
     return args
 
 
@@ -105,16 +108,15 @@ def analyze_args(args):
     return train_csv, test_csv, emb_path, cache
 
 
-def main(args, train_csv, test_csv, embedding, cache):
+def job(args, train_csv, test_csv, embedding, cache):
     """ Main function. Reads data, makes preprocessing, trains model and records results.
         Gets args as argument and passes values of it's fields to functions."""
 
-    data = Data(train_csv, test_csv)
+    data = Data(train_csv, test_csv, cache)
 
     # read and preprocess data
-    tokenizer = choose_tokenizer(args.tokenizer)
-    data.preprocess(tokenizer, args.var_length)
-    data.embedding_lookup(embedding, args.unk_std, cache)
+    data.preprocess(args.tokenizer, args.var_length)
+    data.embedding_lookup(embedding, args.unk_std)
 
     # split train dataset
     data_iter = data.split(args.kfold, args.split_ratio, args.test, args.seed)
@@ -161,8 +163,10 @@ def main(args, train_csv, test_csv, embedding, cache):
     submit(test_ids, test_label)
     print('\n')
 
+def main(main_args=None):
+    args = parse_main_args(main_args)
+    train_csv, test_csv, emb_path, cache = analyze_args(args)
+    job(args, train_csv, test_csv, emb_path, cache)
 
 if __name__ == '__main__':
-    args = parse_script_args()
-    train_csv, test_csv, emb_path, cache = analyze_args(args)
-    main(args, train_csv, test_csv, emb_path, cache)
+    main()
