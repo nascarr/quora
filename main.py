@@ -152,7 +152,7 @@ def job(args, train_csv, test_csv, embedding, cache):
 
 
         # predict test labels
-        test_label, _, test_ids, tresh = learn.predict_labels(is_test=True, tresh=args.f1_tresh)
+        test_label, test_prob,_, test_ids, tresh = learn.predict_labels(is_test=True, tresh=args.f1_tresh)
         if args.test:
             test_loss, test_f1 = learn.evaluate(learn.test_dl, args.f1_tresh)
             learn.recorder.append_info({'test_loss': test_loss, 'test_f1': test_f1}, message='Test set results: ')
@@ -160,7 +160,7 @@ def job(args, train_csv, test_csv, embedding, cache):
 
     # save test predictions to submission.csv
     test_ids = [data.qid.vocab.itos[i] for i in test_ids]
-    submit(test_ids, test_label)
+    submit(test_ids, test_label, test_prob)
     print('\n')
     return record_path
 

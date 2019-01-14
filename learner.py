@@ -180,15 +180,15 @@ class Learner:
             ids += batch.qid.view(-1).data.numpy().tolist()
         return y_pred, y_true, ids
 
-    def predict_labels(self, is_test=False, tresh=0.5):
-        y_pred, y_true, ids = self.predict_probs(is_test=is_test)
+    def predict_labels(self, is_test=False, thresh=0.5):
+        y_prob, y_true, ids = self.predict_probs(is_test=is_test)
 
-        if type(tresh) == list:
-            tresh, max_f1 = choose_thresh(y_pred, y_true, *tresh, message=True)
-            self.recorder.append_info({'best_tr': tresh, 'best_f1': max_f1})
+        if type(thresh) == list:
+            thresh, max_f1 = choose_thresh(y_prob, y_true, *thresh, message=True)
+            self.recorder.append_info({'best_tr': thresh, 'best_f1': max_f1})
 
-        y_label = (np.array(y_pred) >= tresh).astype(int)
-        return y_label, y_true, ids, tresh
+        y_label = (np.array(y_prob) >= thresh).astype(int)
+        return y_label, y_prob, y_true, ids, thresh
 
 
 
@@ -269,7 +269,7 @@ class Recorder:
         for arg in vars(self.args):
             param_dict[arg] = str(getattr(self.args, arg))
         info = torch.load(self.best_info_path)
-        hash = get_hash()
+        hash = get_hash() if self.args.machine == 'kaggle' else 'no_hash'
         passed_args = ' '.join(sys.argv[1:])
         param_dict = {'hash':hash, 'subdir':subdir, **param_dict, **info, 'args': passed_args}
         dict_to_csv(param_dict, csvlog, 'w', 'index', reverse=False)
@@ -278,7 +278,7 @@ class Recorder:
 
         # copy all records to subdir
         png_files = ['val_loss.png', 'val_f1.png'] if not self.args.test else ['loss.png', 'f1.png']
-        csv_files = ['val_probs.csv', 'train_steps.csv']
+        csv_files = ['val_probs.csv', 'train_steps.csv', 'submission.csv', 'submission_probs.csv']
         copy_files([*png_files, 'models/*.info', *csv_files], subdir)
         return subdir
 

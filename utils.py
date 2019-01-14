@@ -8,13 +8,18 @@ import glob
 import shutil
 
 
-def submit(test_ids, prediciton, subm_name='submission.csv'):
+def _submit(test_ids, predictoins, subm_name):
     sub_df = pd.DataFrame()
     sub_df['qid'] = test_ids
-    sub_df['prediction'] = prediciton
+    sub_df['prediction'] = predictoins
     sub_df.to_csv(subm_name, index=False)
 
-    print('predictions saved in submission.csv file')
+
+def submit(test_ids, labels, probs, subm_name='submission.csv'):
+    _submit(test_ids, labels, subm_name)
+    subm_probs_name = subm_name[:-4] + '_probs' + '.csv'  # submission_probs.csv
+    _submit(test_ids, probs, subm_probs_name)
+    print(f'predictions saved in {subm_name}, {subm_probs_name} file')
 
 
 def f1_metric(tp, n_targs, n_preds):

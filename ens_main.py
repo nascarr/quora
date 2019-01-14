@@ -12,12 +12,16 @@ def parse_ens_main_args():
     return args
 
 
+def ens_submit(record_dirs):
+    pass
+
+
 if __name__ == '__main__':
     args = parse_ens_main_args()
     main_args = [a.split() for a in args.main_args]
-    record_paths = []
+    record_dirs = []
     for a in main_args:
-        record_path = main(a)
-        record_paths.append(record_path)
-    ens = Ensemble(record_paths, args.k, model_args='paths')
+        record_dir = main(a)
+        record_dirs.append(record_path)
+    ens = Ensemble(record_dirs, args.k, model_args='paths')
     ens(args)
