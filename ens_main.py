@@ -23,4 +23,4 @@ if __name__ == '__main__':
     ens(args)
 
 # '--mode test -em glove', '--mode test -em wnews', '--mode test -em paragram'
-# "-es 3 -e 8 -em wnews -hd 150 -we 10 --lrstep 10 -mv 700000", "-e 5 -hd 150 -mv 1500000", "-e 8 -hd 150 -em paragram -us 0 -mv 1200000"
+# "-es 3 -e 8 -em wnews -hd 150 -we 10 --lrstep 10 -us 0.1", "-e 5 -hd 150 -us 0.1", "-e 5 -hd 150 -em paragram -us 0"
