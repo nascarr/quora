@@ -120,7 +120,7 @@ class MyVectors(Vectors):
 
             logger.info("Loading vectors from {}".format(path))
 
-            itos, vectors, dim = read_emb(path)
+            itos, vectors, dim = read_emb(path, max_vectors)
 
             self.itos = itos
             self.stoi = {word: i for i, word in enumerate(itos)}
@@ -135,16 +135,16 @@ class MyVectors(Vectors):
             self.itos, self.stoi, self.vectors, self.dim = torch.load(path_pt)
 
 
-def read_emb(path):
+def read_emb(path, max_vectors):
     ext = os.path.splitext(path)[1][1:]
     if ext == 'bin':
         itos, vectors, dim = emb_from_bin(path)
     else:
-        itos, vectors, dim = emb_from_txt(path, ext)
+        itos, vectors, dim = emb_from_txt(path, ext, max_vectors)
     return itos, vectors, dim
 
 
-def emb_from_txt(path, ext):
+def emb_from_txt(path, ext, max_vectors):
     if ext == 'gz':
         open_file = gzip.open
     else:
@@ -200,3 +200,19 @@ def emb_from_bin(path):
     vectors = emb_index.vectors
     dim = emb_index.vector_size
     return itos, vectors, dim
+
+def _infer_shape(f):
+    num_lines, vector_dim = 0, None
+    for line in f:
+        if vector_dim is None:
+            row = line.rstrip().split(b" ")
+            vector = row[1:]
+            # Assuming word, [vector] format
+            if len(vector) > 2:
+                # The header present in some (w2v) formats contains two elements.
+                vector_dim = len(vector)
+                num_lines += 1  # First element read
+        else:
+            num_lines += 1
+    f.seek(0)
+    return num_lines, vector_dim
