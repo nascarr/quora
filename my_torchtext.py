@@ -63,7 +63,34 @@ class MyVectors(Vectors):
     #def __init__(self, *args, **kwargs):
     #    self.tokens = 0
     #    super(MyVectors, self).__init__(*args, *kwargs)
-    #
+    def __init__(self, name, cache=None, to_cache = True,
+                 url=None, unk_init=None, max_vectors=None):
+        """
+        Arguments:
+           name: name of the file that contains the vectors
+           cache: directory for cached vectors
+           url: url for download if vectors not found in cache
+           unk_init (callback): by default, initialize out-of-vocabulary word vectors
+               to zero vectors; can be any function that takes in a Tensor and
+               returns a Tensor of the same size
+           max_vectors (int): this can be used to limit the number of
+               pre-trained vectors loaded.
+               Most pre-trained vector sets are sorted
+               in the descending order of word frequency.
+               Thus, in situations where the entire set doesn't fit in memory,
+               or is not needed for another reason, passing `max_vectors`
+               can limit the size of the loaded set.
+         """
+        cache = '.vector_cache' if cache is None else cache
+        self.itos = None
+        self.stoi = None
+        self.vectors = None
+        self.dim = None
+        self.unk_init = torch.Tensor.zero_ if unk_init is None else unk_init
+        if to_cache:
+            self.cache(name, cache, url=url, max_vectors=max_vectors)
+        else:
+            self.load(name, max_vectors=max_vectors)
 
 
     def __getitem__(self, token):
@@ -133,6 +160,20 @@ class MyVectors(Vectors):
         else:
             logger.info('Loading vectors from {}'.format(path_pt))
             self.itos, self.stoi, self.vectors, self.dim = torch.load(path_pt)
+
+    def load(self, path, max_vectors=None):
+        print('Loading embedding vectors. No cache')
+        if not os.path.isfile(path):
+            raise RuntimeError('no vectors found at {}'.format(path))
+
+        logger.info("Loading vectors from {}".format(path))
+
+        itos, vectors, dim = read_emb(path, max_vectors)
+
+        self.itos = itos
+        self.stoi = {word: i for i, word in enumerate(itos)}
+        self.vectors = torch.Tensor(vectors).view(-1, dim)
+        self.dim = dim
 
 
 def read_emb(path, max_vectors):

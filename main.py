@@ -31,6 +31,7 @@ def parse_main_args(main_args=None):
     arg('--tokenizer', '-t', default='spacy', choices=['spacy', 'whitespace', 'custom', 'lowerspacy', 'gnews_sw', 'gnews_num'])
     arg('--embedding', '-em', default='glove', choices=['glove', 'gnews', 'paragram', 'wnews'])
     arg('--max_vectors', '-mv', default=5000000, type=int)
+    arg('--no_cache', action='store_true')
     arg('--var_length', '-vl', action = 'store_false') # variable sequence length in batches
     arg('--unk_std', '-us', default = 0.001, type=float)
 
@@ -80,6 +81,7 @@ def analyze_args(args):
     elif args.machine == 'kaggle':
         data_dir = '../input'
         cache = '.'
+        args.no_cache = True
 
     train_csv = os.path.join(data_dir, 'train.csv')
     test_csv = os.path.join(data_dir, 'test.csv')
@@ -116,7 +118,8 @@ def job(args, train_csv, test_csv, embedding, cache):
 
     # read and preprocess data
     data.preprocess(args.tokenizer, args.var_length)
-    data.embedding_lookup(embedding, args.unk_std, args.max_vectors)
+    to_cache = not args.no_cache
+    data.embedding_lookup(embedding, args.unk_std, args.max_vectors, to_cache)
 
     # split train dataset
     data_iter = data.split(args.kfold, args.split_ratio, args.test, args.seed)
