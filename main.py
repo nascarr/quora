@@ -88,15 +88,14 @@ def analyze_args(args):
     if args.mode == 'test':
         # create smaller files for testing main function
         n_cut = 1000
-        n_cut_emb = 10000
+        args.max_vectors = 10000
         args.batch_size = n_cut/100
 
         if args.machine == 'kaggle':
             data_dir = '.'
 
         train_small_csv, test_small_csv = reduce_datasets([train_csv, test_csv], data_dir, n_cut)
-        emb_small_path = reduce_embedding(emb_path, data_dir, n_cut_emb)
-        train_csv, test_csv, emb_path = train_small_csv, test_small_csv, emb_small_path
+        train_csv, test_csv = train_small_csv, test_small_csv
     if args.mode == 'run':
         pass
 
