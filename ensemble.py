@@ -16,7 +16,8 @@ class Ensemble:
     ens_record_path = 'notes/ensemble.csv'
 
     def __init__(self, models, is_kfold=False, model_args='names'):
-        self.pred_paths = [get_pred_path(m, model_args) for m in models]
+        self.val_pred_paths = [get_pred_path(m, 'val_probs.csv', model_args) for m in models]
+        self.test_pred_paths = [get_pred_path(m, 'test_probs.csv', model_args) for m in models]
         self.pred_dirs = [get_pred_dir(m, model_args) for m in models]
 
     def __call__(self, args):
@@ -26,7 +27,7 @@ class Ensemble:
         # find best method parameters based on validation data
         y_preds = []
         last_ids = None
-        for pp in self.pred_paths:
+        for pp in self.val_pred_paths:
             ids, y_prob, y_true = load_pred_from_csv(pp)
             y_preds.append(y_prob)
             if last_ids:
@@ -39,7 +40,7 @@ class Ensemble:
         # predict test labels and save submission
         y_preds = []
         last_ids = None
-        for pp in self.pred_paths:
+        for pp in self.test_pred_paths:
             ids, y_prob = load_pred_from_csv(pp, is_label=False)
             y_preds.append(y_prob)
             if last_ids:
@@ -98,11 +99,11 @@ def val_pred_to_csv(ids, y_pred, y_true, fname='val_probs.csv'):
     df.to_csv(fname, index=False)
 
 
-def get_pred_path(m, model_args='names'):
+def get_pred_path(m, pred_file_name, model_args='names'):
     if model_args == 'names':
-        path = os.path.join('./models', model_dict[m][0], 'val_probs.csv')
+        path = os.path.join('./models', model_dict[m][0], pred_file_name)
     elif model_args == 'paths':
-        path = os.path.join(m, 'val_probs.csv')
+        path = os.path.join(m, pred_file_name)
     return path
 
 
