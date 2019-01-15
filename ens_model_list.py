@@ -6,6 +6,9 @@ model_dict = {
     'glove': ('Jan_10_2019__22:10:15', '-es 2 -e 9 -hd 150'), # 829
     'paragram': ('Jan_11_2019__11:10:57', '-hd 150 -es 2 -e 10 -em paragram -t lowerspacy -us 0'), #873
     'gnews': ('Jan_11_2019__20:21:01', '-em gnews -es 2 -e 10 -hd 150 -us 0.1'), # 889
+    'gnews_num': ('Jan_12_2019__22:13:37', '-em gnews -t gnews_num -es 2 -e 10 -us 0.1 -hd 150'), # 927
     'wnews_test': ('Jan_10_2019__19:33:05_test', '--mode test -em wnews'),
     'glove_test': ('Jan_10_2019__19:34:39_test', '--mode test -em glove'),
+    'wnews_us': ('', ''),
+    'glove_us': ('', ''),
 }
