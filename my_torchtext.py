@@ -138,7 +138,7 @@ class MyVectors(Vectors):
 def read_emb(path, max_vectors):
     ext = os.path.splitext(path)[1][1:]
     if ext == 'bin':
-        itos, vectors, dim = emb_from_bin(path)
+        itos, vectors, dim = emb_from_bin(path, max_vectors)
     else:
         itos, vectors, dim = emb_from_txt(path, ext, max_vectors)
     return itos, vectors, dim
@@ -194,8 +194,8 @@ def emb_from_txt(path, ext, max_vectors):
     return itos, vectors, dim
 
 
-def emb_from_bin(path):
-    emb_index = KeyedVectors.load_word2vec_format(path, binary=True)
+def emb_from_bin(path, max_vectors):
+    emb_index = KeyedVectors.load_word2vec_format(path, limit = max_vectors, binary=True)
     itos = emb_index.index2word
     vectors = emb_index.vectors
     dim = emb_index.vector_size
