@@ -1661,7 +1661,7 @@ def parse_ens_args():
 def parse_ens_main_args():
     parser = argparse.ArgumentParser(parents=[ens_parser(add_help=False)])
     arg = parser.add_argument
-    arg('--main_args', '-a', nargs='+', default=["--mode test -em glove", "--mode test -em wnews", "--mode test -em paragram", "--mode test -em gnews"], type=str)
+    arg('--main_args', '-a', nargs='+', default=["-es 3 -e 8 -em wnews -hd 150 -we 10 --lrstep 10 -us 0.1", "-e 5 -hd 150 -us 0.1", "-e 5 -hd 150 -em paragram -us 0", "-em gnews -es 2 -e 8 -hd 150 -us 0.1"], type=str)
     args = parser.parse_args()
     return args
 
@@ -1677,4 +1677,4 @@ if __name__ == '__main__':
     ens(args)
 
 # '--mode test -em glove', '--mode test -em wnews', '--mode test -em paragram', '--mode test -em gnews'
-# "-es 3 -e 8 -em wnews -hd 150 -we 10 --lrstep 10 -us 0.1", "-e 5 -hd 150 -us 0.1", "-e 5 -hd 150 -em paragram -us 0"
+# "-es 3 -e 8 -em wnews -hd 150 -we 10 --lrstep 10 -us 0.1", "-e 5 -hd 150 -us 0.1", "-e 5 -hd 150 -em paragram -us 0", "-em gnews -es 2 -e 8 -hd 150 -us 0.1"
