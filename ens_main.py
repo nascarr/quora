@@ -7,7 +7,7 @@ from ens_model_list import model_dict
 def parse_ens_main_args():
     parser = argparse.ArgumentParser(parents=[ens_parser(add_help=False)])
     arg = parser.add_argument
-    arg('--main_args', '-a', nargs='+', default=["-es 3 -e 1 -em wnews -hd 150 -we 10 --lrstep 10 -mv 700000", "-e 1 -hd 150 -mv 1500000", "-e 1 -hd 150 -em paragram -us 0 -mv 1200000"], type=str)
+    arg('--main_args', '-a', nargs='+', default=["-es 3 -e 1 -em wnews -hd 150 -we 10 --lrstep 10 -mv 700000"], type=str)
     args = parser.parse_args()
     return args
 
