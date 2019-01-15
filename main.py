@@ -30,6 +30,7 @@ def parse_main_args(main_args=None):
     arg('--seed', default=2018, type=int)
     arg('--tokenizer', '-t', default='spacy', choices=['spacy', 'whitespace', 'custom', 'lowerspacy', 'gnews_sw', 'gnews_num'])
     arg('--embedding', '-em', default='glove', choices=['glove', 'gnews', 'paragram', 'wnews'])
+    arg('--max_vectors', '-mv', default=5000000, type=int)
     arg('--var_length', '-vl', action = 'store_false') # variable sequence length in batches
     arg('--unk_std', '-us', default = 0.001, type=float)
 
@@ -41,7 +42,7 @@ def parse_main_args(main_args=None):
     arg('--batch_size', '-bs', default=512, type=int)
     arg('--n_eval', '-ne', default=1, type=int, help='Number of validation set evaluations during 1 epoch')
     arg('--warmup_epoch', '-we', default=2, type=int, help='Number of epochs without fine tuning')
-    arg('--early_stop', '-es', default=1, type=int, help='Stop training if no improvement during this number of epochs')
+    arg('--early_stop', '-es', default=2, type=int, help='Stop training if no improvement during this number of epochs')
     arg('--f1_tresh', '-ft', default=0.335, type=float)
     arg('--clip', type=float, default=1, help='gradient clipping')
 
@@ -116,7 +117,7 @@ def job(args, train_csv, test_csv, embedding, cache):
 
     # read and preprocess data
     data.preprocess(args.tokenizer, args.var_length)
-    data.embedding_lookup(embedding, args.unk_std)
+    data.embedding_lookup(embedding, args.unk_std, args.max_vectors)
 
     # split train dataset
     data_iter = data.split(args.kfold, args.split_ratio, args.test, args.seed)

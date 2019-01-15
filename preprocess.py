@@ -49,11 +49,11 @@ class Data:
         print_duration(time_start, 'time to read and tokenize data: ')
 
 
-    def embedding_lookup(self, embedding, unk_std):
+    def embedding_lookup(self, embedding, unk_std, max_vectors):
         print('embedding lookup...')
         time_start = time.time()
         unk_init = partial(normal_init, std=unk_std)
-        self.text.vocab.load_vectors(MyVectors(embedding, cache=self.cache, unk_init=unk_init))
+        self.text.vocab.load_vectors(MyVectors(embedding, cache=self.cache, unk_init=unk_init, max_vectors=max_vectors))
         print_duration(time_start, 'time for embedding lookup: ')
         return
 
