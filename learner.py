@@ -269,7 +269,7 @@ class Recorder:
         for arg in vars(self.args):
             param_dict[arg] = str(getattr(self.args, arg))
         info = torch.load(self.best_info_path)
-        hash = get_hash() if self.args.machine == 'kaggle' else 'no_hash'
+        hash = get_hash() if self.args.machine == 'dt' else 'no_hash'
         passed_args = ' '.join(sys.argv[1:])
         param_dict = {'hash':hash, 'subdir':subdir, **param_dict, **info, 'args': passed_args}
         dict_to_csv(param_dict, csvlog, 'w', 'index', reverse=False)

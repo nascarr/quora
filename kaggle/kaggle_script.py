@@ -1,12 +1,6 @@
 #!/usr/bin/env python
-import re
-import spacy
 import os
 import pandas as pd
-from torchtext.data.dataset import *
-from torchtext.vocab import *
-import numpy as np
-            # Explicitly splitting on " " is important, so we don't
 import subprocess
 import pandas as pd
 import numpy as np
@@ -16,9 +10,12 @@ import matplotlib.pyplot as plt
 import glob
 import shutil
 import torch.optim as optim
-import numpy as np
 import torch
 import torch.nn as nn
+from torchtext.data.dataset import *
+from torchtext.vocab import *
+import numpy as np
+            # Explicitly splitting on " " is important, so we don't
 import torch
 import time
 import random
@@ -26,6 +23,9 @@ import pickle
 import os
 from functools import partial
 import torchtext.data as data
+import numpy as np
+import re
+import spacy
 import numpy as np
 import torch
 import torch.nn as nn
@@ -47,92 +47,6 @@ import pandas as pd
 import os
 import csv
 from sklearn.metrics import f1_score
-
-
-def lower_spacy(x):
-    spacy_en = spacy.load('en')
-    tokens = [tok.text.lower() for tok in spacy_en.tokenizer(x)]
-    return tokens
-
-
-class LowerSpacy(object):
-    def __init__(self):
-        self.tokenizer = spacy.load('en').tokenizer
-
-    def __call__(self, x):
-        return [tok.text.lower() for tok in self.tokenizer(x)]
-
-
-class WhitespaceTokenizer(object):
-    def __init__(self):
-        pass
-
-    def __call__(self, text):
-        words = text.split(' ')
-        return words
-
-
-class CustomTokenizer(object):
-    def __init__(self):
-        #self.allowed_re = re.compile('^[A-Za-z0-9.,?!()]*$')
-        self.punct = re.compile('[,!.?()]')
-
-    def __call__(self, text):
-        substrings = text.split(' ')
-        tokens = []
-        for ss in substrings:
-            punct_match = self.punct.search(ss)
-            if punct_match:
-                start = punct_match.start()
-                ss_tokens = [ss[:start], ss[start], ss[start + 1:]]
-                ss_tokens = [t for t in ss_tokens if len(t) > 0]
-            else:
-                ss_tokens = [ss]
-            tokens.extend(ss_tokens)
-        return tokens
-
-
-class GNewsTokenizerSW(object):
-    def __init__(self):
-        self.spacy_en = spacy.load('en')
-        self.tokenizer = self.spacy_en.tokenizer
-        self.remove_all_stopwords()
-        self.add_stopwords(GNEWS_STOP_WORDS)
-
-    def __call__(self, x):
-        result = [tok.text for tok in self.tokenizer(x) if not tok.is_stop]
-        if len(result) == 0:
-            return ['<zero_length>']
-        else:
-            return result
-
-    def remove_all_stopwords(self):
-        spacy_stopwords = spacy.lang.en.stop_words.STOP_WORDS
-        for w in spacy_stopwords:
-            lexeme = self.spacy_en.vocab[w]
-            lexeme.is_stop = False
-
-    def add_stopwords(self, custom_stop_words):
-        for w in custom_stop_words:
-            lexeme = self.spacy_en.vocab[w]
-            lexeme.is_stop = True
-
-
-class GNewsTokenizerNum(object):
-    def __init__(self):
-        self.spacy_en = spacy.load('en')
-        self.tokenizer = self.spacy_en.tokenizer
-        self.num_symb_re = re.compile('^[^a-zA-Z]*[0-9]+[^a-zA-Z]*$')
-        self.sub_re = re.compile('[0-9]')
-
-    def tokenize_numbers(self, tok):
-        if self.num_symb_re.match(tok) and len(tok) > 1:
-            tok = self.sub_re.sub('#', tok)
-        return tok
-
-    def __call__(self, x):
-        return [self.tokenize_numbers(tok.text) for tok in self.tokenizer(x)]
-
 
 def read_datasets_to_df(datasets):
     dfs = []
@@ -208,203 +122,6 @@ def reduce_embedding(emb_path, new_dir, n):
             f.write(''.join(head))
     return small_emb_path
 
-# Overriding torchtext methods
-
-
-class MyTabularDataset(TabularDataset):
-    """Subclass of torch.data.dataset.TabularDataset for k-fold cross-validation"""
-
-    def split(self, split_ratio=0.8, stratified=False, strata_field='label',
-              random_state=None):
-        splits = super().split(split_ratio, stratified, strata_field, random_state)
-        return [splits]
-
-    def split_kfold(self, k, stratified=False, is_test=False, random_state=None):
-        def _iter_folds():
-            i = 0
-            while i < k:
-                # val index
-                val_start_idx = cut_idxs[i]
-                val_end_idx = cut_idxs[i + 1]
-                val_index = randperm[val_start_idx:val_end_idx]
-
-                # test index
-                if is_test:
-                    if i <= k - 2:
-                        test_start_idx = cut_idxs[i + 1]
-                        test_end_idx = cut_idxs[i + 2]
-                    else:
-                        test_start_idx = cut_idxs[0]
-                        test_end_idx = cut_idxs[1]
-                    test_index = randperm[test_start_idx:test_end_idx]
-                else:
-                    test_index = []
-
-                # train index
-                train_index = list(set(randperm) - set(test_index) - set(val_index))
-
-                # split examples by index and create datasets
-                train_data, val_data, test_data = tuple([self.examples[idx] for idx in index]
-                                                        for index in [train_index, val_index, test_index])
-                splits = tuple(Dataset(d, self.fields)
-                               for d in (train_data, val_data, test_data) if d)
-
-                # In case the parent sort key isn't none
-                if self.sort_key:
-                    for subset in splits:
-                        subset.sort_key = self.sort_key
-                i += 1
-                yield splits
-
-        rnd = RandomShuffler(random_state)
-        N = len(self.examples)
-        randperm = rnd(range(N))
-        fold_len = int(N/k)
-        cut_idxs = [e * fold_len for e in list(range(k))] + [N]
-        data_iter = _iter_folds()
-        return data_iter
-
-
-class MyVectors(Vectors):
-    #def __init__(self, *args, **kwargs):
-    #    self.tokens = 0
-    #    super(MyVectors, self).__init__(*args, *kwargs)
-    #
-
-
-    def __getitem__(self, token):
-        if token in self.stoi:
-            #self.tokens += 1
-            #print(self.tokens, self.low_tokens)
-            return self.vectors[self.stoi[token]]
-        elif token.lower() in self.stoi:
-            #self.low_tokens += 1
-            return self.vectors[self.stoi[token.lower()]]
-        else:
-            return self.unk_init(torch.Tensor(self.dim))
-
-    def cache(self, name, cache, url=None, max_vectors=None):
-        if os.path.isfile(name):
-            path = name
-            if max_vectors:
-                file_suffix = '_{}.pt'.format(max_vectors)
-            else:
-                file_suffix = '.pt'
-            path_pt = os.path.join(cache, os.path.basename(name)) + file_suffix
-        else:
-            path = os.path.join(cache, name)
-            if max_vectors:
-                file_suffix = '_{}.pt'.format(max_vectors)
-            else:
-                file_suffix = '.pt'
-            path_pt = path + file_suffix
-
-        if not os.path.isfile(path_pt):
-            if not os.path.isfile(path) and url:
-                logger.info('Downloading vectors from {}'.format(url))
-                if not os.path.exists(cache):
-                    os.makedirs(cache)
-                dest = os.path.join(cache, os.path.basename(url))
-                if not os.path.isfile(dest):
-                    with tqdm(unit='B', unit_scale=True, miniters=1, desc=dest) as t:
-                        try:
-                            urlretrieve(url, dest, reporthook=reporthook(t))
-                        except KeyboardInterrupt as e:  # remove the partial zip file
-                            os.remove(dest)
-                            raise e
-                logger.info('Extracting vectors into {}'.format(cache))
-                ext = os.path.splitext(dest)[1][1:]
-                if ext == 'zip':
-                    with zipfile.ZipFile(dest, "r") as zf:
-                        zf.extractall(cache)
-                elif ext == 'gz':
-                    if dest.endswith('.tar.gz'):
-                        with tarfile.open(dest, 'r:gz') as tar:
-                            tar.extractall(path=cache)
-            if not os.path.isfile(path):
-                raise RuntimeError('no vectors found at {}'.format(path))
-
-            logger.info("Loading vectors from {}".format(path))
-
-            itos, vectors, dim = read_emb(path)
-
-            self.itos = itos
-            self.stoi = {word: i for i, word in enumerate(itos)}
-            self.vectors = torch.Tensor(vectors).view(-1, dim)
-            self.dim = dim
-            logger.info('Saving vectors to {}'.format(path_pt))
-            if not os.path.exists(cache):
-                os.makedirs(cache)
-            torch.save((self.itos, self.stoi, self.vectors, self.dim), path_pt)
-        else:
-            logger.info('Loading vectors from {}'.format(path_pt))
-            self.itos, self.stoi, self.vectors, self.dim = torch.load(path_pt)
-
-
-def read_emb(path):
-    ext = os.path.splitext(path)[1][1:]
-    if ext == 'bin':
-        itos, vectors, dim = emb_from_bin(path)
-    else:
-        itos, vectors, dim = emb_from_txt(path, ext)
-    return itos, vectors, dim
-
-
-def emb_from_txt(path, ext):
-    if ext == 'gz':
-        open_file = gzip.open
-    else:
-        open_file = open
-
-    vectors_loaded = 0
-    with open_file(path, 'rb') as f:
-        num_lines, dim = _infer_shape(f)
-        if not max_vectors or max_vectors > num_lines:
-            max_vectors = num_lines
-
-        itos, vectors, dim = [], torch.zeros((max_vectors, dim)), None
-
-        for line in tqdm(f, total=num_lines):
-            # get rid of Unicode non-breaking spaces in the vectors.
-            entries = line.rstrip().split(b" ")
-
-            word, entries = entries[0], entries[1:]
-            if dim is None and len(entries) > 1:
-                dim = len(entries)
-            elif len(entries) == 1:
-                logger.warning("Skipping token {} with 1-dimensional "
-                               "vector {}; likely a header".format(word, entries))
-                continue
-            elif dim != len(entries):
-                raise RuntimeError(
-                    "Vector for token {} has {} dimensions, but previously "
-                    "read vectors have {} dimensions. All vectors must have "
-                    "the same number of dimensions.".format(word, len(entries),
-                                                            dim))
-
-            try:
-                if isinstance(word, six.binary_type):
-                    word = word.decode('utf-8')
-            except UnicodeDecodeError:
-                logger.info("Skipping non-UTF8 token {}".format(repr(word)))
-                continue
-
-            vectors[vectors_loaded] = torch.tensor([float(x) for x in entries])
-            vectors_loaded += 1
-            itos.append(word)
-
-            if vectors_loaded == max_vectors:
-                break
-
-    return itos, vectors, dim
-
-
-def emb_from_bin(path):
-    emb_index = KeyedVectors.load_word2vec_format(path, binary=True)
-    itos = emb_index.index2word
-    vectors = emb_index.vectors
-    dim = emb_index.vector_size
-    return itos, vectors, dim
 
 
 def _submit(test_ids, predictoins, subm_name):
@@ -536,27 +253,6 @@ def choose_optimizer(params, args):
     elif args.optim == 'AdamW':
         optimizer = optim.Adam(params, lr=args.lr, betas=(0.9, 0.99))
     return optimizer
-
-def ens_mean(preds, args):
-    return np.mean(np.array(preds), 0)
-
-
-def ens_weight(preds, args):
-    weights = args.weights
-    preds = np.array(preds)
-    if weights:
-        weights = np.array(weights)
-        preds = np.transpose(preds)
-        final_pred = np.transpose(preds.dot(weights))
-        return final_pred
-    else:
-        pass
-    return np.mean(np.array(preds), 0)
-
-
-methods = {'mean': ens_mean,
-           'weight': ens_weight}
-
 
 def section_sizes_and_lengths(lengths):
     bs = len(lengths)
@@ -916,17 +612,219 @@ class BiLSTMPool_2FC(nn.Module):
         average_pool = torch.mean(lstm_out, 0)
         y = self.fc1(self.dropout(torch.cat((max_pool, average_pool, output), dim=1)))
         y = self.fc2(self.dropout(y))
-        return y# list of possible models for ensemble
+        return y# Overriding torchtext methods
 
 
-model_dict = {
-    'wnews': ('Jan_10_2019__21:56:52', '-es 3 -e 10 -em wnews  -hd 150 -we 10 --lrstep 10'), # 827
-    'glove': ('Jan_10_2019__22:10:15', '-es 2 -e 9 -hd 150'), # 829
-    'paragram': ('Jan_11_2019__11:10:57', '-hd 150 -es 2 -e 10 -em paragram -t lowerspacy -us 0'), #873
-    'gnews': ('Jan_11_2019__20:21:01', '-em gnews -es 2 -e 10 -hd 150 -us 0.1'), # 889
-    'wnews_test': ('Jan_10_2019__19:33:05_test', '--mode test -em wnews'),
-    'glove_test': ('Jan_10_2019__19:34:39_test', '--mode test -em glove'),
-}
+class MyTabularDataset(TabularDataset):
+    """Subclass of torch.data.dataset.TabularDataset for k-fold cross-validation"""
+
+    def split(self, split_ratio=0.8, stratified=False, strata_field='label',
+              random_state=None):
+        splits = super().split(split_ratio, stratified, strata_field, random_state)
+        return [splits]
+
+    def split_kfold(self, k, stratified=False, is_test=False, random_state=None):
+        def _iter_folds():
+            i = 0
+            while i < k:
+                # val index
+                val_start_idx = cut_idxs[i]
+                val_end_idx = cut_idxs[i + 1]
+                val_index = randperm[val_start_idx:val_end_idx]
+
+                # test index
+                if is_test:
+                    if i <= k - 2:
+                        test_start_idx = cut_idxs[i + 1]
+                        test_end_idx = cut_idxs[i + 2]
+                    else:
+                        test_start_idx = cut_idxs[0]
+                        test_end_idx = cut_idxs[1]
+                    test_index = randperm[test_start_idx:test_end_idx]
+                else:
+                    test_index = []
+
+                # train index
+                train_index = list(set(randperm) - set(test_index) - set(val_index))
+
+                # split examples by index and create datasets
+                train_data, val_data, test_data = tuple([self.examples[idx] for idx in index]
+                                                        for index in [train_index, val_index, test_index])
+                splits = tuple(Dataset(d, self.fields)
+                               for d in (train_data, val_data, test_data) if d)
+
+                # In case the parent sort key isn't none
+                if self.sort_key:
+                    for subset in splits:
+                        subset.sort_key = self.sort_key
+                i += 1
+                yield splits
+
+        rnd = RandomShuffler(random_state)
+        N = len(self.examples)
+        randperm = rnd(range(N))
+        fold_len = int(N/k)
+        cut_idxs = [e * fold_len for e in list(range(k))] + [N]
+        data_iter = _iter_folds()
+        return data_iter
+
+
+class MyVectors(Vectors):
+    #def __init__(self, *args, **kwargs):
+    #    self.tokens = 0
+    #    super(MyVectors, self).__init__(*args, *kwargs)
+    #
+
+
+    def __getitem__(self, token):
+        if token in self.stoi:
+            #self.tokens += 1
+            #print(self.tokens, self.low_tokens)
+            return self.vectors[self.stoi[token]]
+        elif token.lower() in self.stoi:
+            #self.low_tokens += 1
+            return self.vectors[self.stoi[token.lower()]]
+        else:
+            return self.unk_init(torch.Tensor(self.dim))
+
+    def cache(self, name, cache, url=None, max_vectors=None):
+        if os.path.isfile(name):
+            path = name
+            if max_vectors:
+                file_suffix = '_{}.pt'.format(max_vectors)
+            else:
+                file_suffix = '.pt'
+            path_pt = os.path.join(cache, os.path.basename(name)) + file_suffix
+        else:
+            path = os.path.join(cache, name)
+            if max_vectors:
+                file_suffix = '_{}.pt'.format(max_vectors)
+            else:
+                file_suffix = '.pt'
+            path_pt = path + file_suffix
+
+        if not os.path.isfile(path_pt):
+            if not os.path.isfile(path) and url:
+                logger.info('Downloading vectors from {}'.format(url))
+                if not os.path.exists(cache):
+                    os.makedirs(cache)
+                dest = os.path.join(cache, os.path.basename(url))
+                if not os.path.isfile(dest):
+                    with tqdm(unit='B', unit_scale=True, miniters=1, desc=dest) as t:
+                        try:
+                            urlretrieve(url, dest, reporthook=reporthook(t))
+                        except KeyboardInterrupt as e:  # remove the partial zip file
+                            os.remove(dest)
+                            raise e
+                logger.info('Extracting vectors into {}'.format(cache))
+                ext = os.path.splitext(dest)[1][1:]
+                if ext == 'zip':
+                    with zipfile.ZipFile(dest, "r") as zf:
+                        zf.extractall(cache)
+                elif ext == 'gz':
+                    if dest.endswith('.tar.gz'):
+                        with tarfile.open(dest, 'r:gz') as tar:
+                            tar.extractall(path=cache)
+            if not os.path.isfile(path):
+                raise RuntimeError('no vectors found at {}'.format(path))
+
+            logger.info("Loading vectors from {}".format(path))
+
+            itos, vectors, dim = read_emb(path, max_vectors)
+
+            self.itos = itos
+            self.stoi = {word: i for i, word in enumerate(itos)}
+            self.vectors = torch.Tensor(vectors).view(-1, dim)
+            self.dim = dim
+            logger.info('Saving vectors to {}'.format(path_pt))
+            if not os.path.exists(cache):
+                os.makedirs(cache)
+            torch.save((self.itos, self.stoi, self.vectors, self.dim), path_pt)
+        else:
+            logger.info('Loading vectors from {}'.format(path_pt))
+            self.itos, self.stoi, self.vectors, self.dim = torch.load(path_pt)
+
+
+def read_emb(path, max_vectors):
+    ext = os.path.splitext(path)[1][1:]
+    if ext == 'bin':
+        itos, vectors, dim = emb_from_bin(path)
+    else:
+        itos, vectors, dim = emb_from_txt(path, ext, max_vectors)
+    return itos, vectors, dim
+
+
+def emb_from_txt(path, ext, max_vectors):
+    if ext == 'gz':
+        open_file = gzip.open
+    else:
+        open_file = open
+
+    vectors_loaded = 0
+    with open_file(path, 'rb') as f:
+        num_lines, dim = _infer_shape(f)
+        if not max_vectors or max_vectors > num_lines:
+            max_vectors = num_lines
+
+        itos, vectors, dim = [], torch.zeros((max_vectors, dim)), None
+
+        for line in f:
+            # get rid of Unicode non-breaking spaces in the vectors.
+            entries = line.rstrip().split(b" ")
+
+            word, entries = entries[0], entries[1:]
+            if dim is None and len(entries) > 1:
+                dim = len(entries)
+            elif len(entries) == 1:
+                logger.warning("Skipping token {} with 1-dimensional "
+                               "vector {}; likely a header".format(word, entries))
+                continue
+            elif dim != len(entries):
+                raise RuntimeError(
+                    "Vector for token {} has {} dimensions, but previously "
+                    "read vectors have {} dimensions. All vectors must have "
+                    "the same number of dimensions.".format(word, len(entries),
+                                                            dim))
+
+            try:
+                if isinstance(word, six.binary_type):
+                    word = word.decode('utf-8')
+            except UnicodeDecodeError:
+                logger.info("Skipping non-UTF8 token {}".format(repr(word)))
+                continue
+
+            vectors[vectors_loaded] = torch.tensor([float(x) for x in entries])
+            vectors_loaded += 1
+            itos.append(word)
+
+            if vectors_loaded == max_vectors:
+                break
+
+    return itos, vectors, dim
+
+
+def emb_from_bin(path):
+    emb_index = KeyedVectors.load_word2vec_format(path, binary=True)
+    itos = emb_index.index2word
+    vectors = emb_index.vectors
+    dim = emb_index.vector_size
+    return itos, vectors, dim
+
+def _infer_shape(f):
+    num_lines, vector_dim = 0, None
+    for line in f:
+        if vector_dim is None:
+            row = line.rstrip().split(b" ")
+            vector = row[1:]
+            # Assuming word, [vector] format
+            if len(vector) > 2:
+                # The header present in some (w2v) formats contains two elements.
+                vector_dim = len(vector)
+                num_lines += 1  # First element read
+        else:
+            num_lines += 1
+    f.seek(0)
+    return num_lines, vector_dim
 
 
 
@@ -968,11 +866,11 @@ class Data:
         print_duration(time_start, 'time to read and tokenize data: ')
 
 
-    def embedding_lookup(self, embedding, unk_std):
+    def embedding_lookup(self, embedding, unk_std, max_vectors):
         print('embedding lookup...')
         time_start = time.time()
         unk_init = partial(normal_init, std=unk_std)
-        self.text.vocab.load_vectors(MyVectors(embedding, cache=self.cache, unk_init=unk_init))
+        self.text.vocab.load_vectors(MyVectors(embedding, cache=self.cache, unk_init=unk_init, max_vectors=max_vectors))
         print_duration(time_start, 'time for embedding lookup: ')
         return
 
@@ -1007,6 +905,124 @@ def iterate(train, val, test, batch_size):
                                     train=False,
                                     sort_within_batch=True)
     return train_iter, val_iter, test_iter
+
+
+def ens_mean(preds, args):
+    return np.mean(np.array(preds), 0)
+
+
+def ens_weight(preds, args):
+    weights = args.weights
+    preds = np.array(preds)
+    if weights:
+        weights = np.array(weights)
+        preds = np.transpose(preds)
+        final_pred = np.transpose(preds.dot(weights))
+        return final_pred
+    else:
+        pass
+    return np.mean(np.array(preds), 0)
+
+
+methods = {'mean': ens_mean,
+           'weight': ens_weight}
+# list of possible models for ensemble
+
+
+model_dict = {
+    'wnews': ('Jan_10_2019__21:56:52', '-es 3 -e 10 -em wnews  -hd 150 -we 10 --lrstep 10'), # 827
+    'glove': ('Jan_10_2019__22:10:15', '-es 2 -e 9 -hd 150'), # 829
+    'paragram': ('Jan_11_2019__11:10:57', '-hd 150 -es 2 -e 10 -em paragram -t lowerspacy -us 0'), #873
+    'gnews': ('Jan_11_2019__20:21:01', '-em gnews -es 2 -e 10 -hd 150 -us 0.1'), # 889
+    'wnews_test': ('Jan_10_2019__19:33:05_test', '--mode test -em wnews'),
+    'glove_test': ('Jan_10_2019__19:34:39_test', '--mode test -em glove'),
+}
+
+
+def lower_spacy(x):
+    spacy_en = spacy.load('en')
+    tokens = [tok.text.lower() for tok in spacy_en.tokenizer(x)]
+    return tokens
+
+
+class LowerSpacy(object):
+    def __init__(self):
+        self.tokenizer = spacy.load('en').tokenizer
+
+    def __call__(self, x):
+        return [tok.text.lower() for tok in self.tokenizer(x)]
+
+
+class WhitespaceTokenizer(object):
+    def __init__(self):
+        pass
+
+    def __call__(self, text):
+        words = text.split(' ')
+        return words
+
+
+class CustomTokenizer(object):
+    def __init__(self):
+        #self.allowed_re = re.compile('^[A-Za-z0-9.,?!()]*$')
+        self.punct = re.compile('[,!.?()]')
+
+    def __call__(self, text):
+        substrings = text.split(' ')
+        tokens = []
+        for ss in substrings:
+            punct_match = self.punct.search(ss)
+            if punct_match:
+                start = punct_match.start()
+                ss_tokens = [ss[:start], ss[start], ss[start + 1:]]
+                ss_tokens = [t for t in ss_tokens if len(t) > 0]
+            else:
+                ss_tokens = [ss]
+            tokens.extend(ss_tokens)
+        return tokens
+
+
+class GNewsTokenizerSW(object):
+    def __init__(self):
+        self.spacy_en = spacy.load('en')
+        self.tokenizer = self.spacy_en.tokenizer
+        self.remove_all_stopwords()
+        self.add_stopwords(GNEWS_STOP_WORDS)
+
+    def __call__(self, x):
+        result = [tok.text for tok in self.tokenizer(x) if not tok.is_stop]
+        if len(result) == 0:
+            return ['<zero_length>']
+        else:
+            return result
+
+    def remove_all_stopwords(self):
+        spacy_stopwords = spacy.lang.en.stop_words.STOP_WORDS
+        for w in spacy_stopwords:
+            lexeme = self.spacy_en.vocab[w]
+            lexeme.is_stop = False
+
+    def add_stopwords(self, custom_stop_words):
+        for w in custom_stop_words:
+            lexeme = self.spacy_en.vocab[w]
+            lexeme.is_stop = True
+
+
+class GNewsTokenizerNum(object):
+    def __init__(self):
+        self.spacy_en = spacy.load('en')
+        self.tokenizer = self.spacy_en.tokenizer
+        self.num_symb_re = re.compile('^[^a-zA-Z]*[0-9]+[^a-zA-Z]*$')
+        self.sub_re = re.compile('[0-9]')
+
+    def tokenize_numbers(self, tok):
+        if self.num_symb_re.match(tok) and len(tok) > 1:
+            tok = self.sub_re.sub('#', tok)
+        return tok
+
+    def __call__(self, x):
+        return [self.tokenize_numbers(tok.text) for tok in self.tokenizer(x)]
+
 
 
 class Learner:
@@ -1323,12 +1339,13 @@ def parse_main_args(main_args=None):
     arg('--seed', default=2018, type=int)
     arg('--tokenizer', '-t', default='spacy', choices=['spacy', 'whitespace', 'custom', 'lowerspacy', 'gnews_sw', 'gnews_num'])
     arg('--embedding', '-em', default='glove', choices=['glove', 'gnews', 'paragram', 'wnews'])
+    arg('--max_vectors', '-mv', default=5000000, type=int)
     arg('--var_length', '-vl', action = 'store_false') # variable sequence length in batches
     arg('--unk_std', '-us', default = 0.001, type=float)
 
     # training params
     arg('--optim', '-o', default='Adam', choices=['Adam', 'AdamW'])
-    arg('--epoch', '-e', default=8, type=int)
+    arg('--epoch', '-e', default=7, type=int)
     arg('--lr', '-lr', default=1e-3, type=float)
     arg('--lrstep', default=[3], nargs='+', type=int) # steps when lr multiplied by 0.1
     arg('--batch_size', '-bs', default=512, type=int)
@@ -1343,7 +1360,7 @@ def parse_main_args(main_args=None):
                                                     'BiGRUPool_2FC', 'BiLSTMPool_2FC', 'BiLSTMPoolFast', 'BiLSTMPoolOld',
                                                     'BiLSTMPoolTest'])
     arg('--n_layers', '-n', default=2, type=int, help='Number of layers in model')
-    arg('--hidden_dim', '-hd', type=int, default=150)
+    arg('--hidden_dim', '-hd', type=int, default=100)
     arg('--dropout', '-d', type=float, default=0.2)
 
     if main_args:
@@ -1409,7 +1426,7 @@ def job(args, train_csv, test_csv, embedding, cache):
 
     # read and preprocess data
     data.preprocess(args.tokenizer, args.var_length)
-    data.embedding_lookup(embedding, args.unk_std)
+    data.embedding_lookup(embedding, args.unk_std, args.max_vectors)
 
     # split train dataset
     data_iter = data.split(args.kfold, args.split_ratio, args.test, args.seed)
@@ -1473,7 +1490,8 @@ class Ensemble:
     ens_record_path = 'notes/ensemble.csv'
 
     def __init__(self, models, is_kfold=False, model_args='names'):
-        self.pred_paths = [get_pred_path(m, model_args) for m in models]
+        self.val_pred_paths = [get_pred_path(m, 'val_probs.csv', model_args) for m in models]
+        self.test_pred_paths = [get_pred_path(m, 'test_probs.csv', model_args) for m in models]
         self.pred_dirs = [get_pred_dir(m, model_args) for m in models]
 
     def __call__(self, args):
@@ -1483,7 +1501,7 @@ class Ensemble:
         # find best method parameters based on validation data
         y_preds = []
         last_ids = None
-        for pp in self.pred_paths:
+        for pp in self.val_pred_paths:
             ids, y_prob, y_true = load_pred_from_csv(pp)
             y_preds.append(y_prob)
             if last_ids:
@@ -1496,7 +1514,7 @@ class Ensemble:
         # predict test labels and save submission
         y_preds = []
         last_ids = None
-        for pp in self.pred_paths:
+        for pp in self.test_pred_paths:
             ids, y_prob = load_pred_from_csv(pp, is_label=False)
             y_preds.append(y_prob)
             if last_ids:
@@ -1555,11 +1573,11 @@ def val_pred_to_csv(ids, y_pred, y_true, fname='val_probs.csv'):
     df.to_csv(fname, index=False)
 
 
-def get_pred_path(m, model_args='names'):
+def get_pred_path(m, pred_file_name, model_args='names'):
     if model_args == 'names':
-        path = os.path.join('./models', model_dict[m][0], 'val_probs.csv')
+        path = os.path.join('./models', model_dict[m][0], pred_file_name)
     elif model_args == 'paths':
-        path = os.path.join(m, 'val_probs.csv')
+        path = os.path.join(m, pred_file_name)
     return path
 
 
@@ -1596,15 +1614,13 @@ def parse_ens_args():
     args = parser.parse_args()
     return args
 
-
-
 #!/usr/bin/env python
 
 
 def parse_ens_main_args():
     parser = argparse.ArgumentParser(parents=[ens_parser(add_help=False)])
     arg = parser.add_argument
-    arg('--main_args', '-a', nargs='+', default=['--mode test -em glove', '--mode test -em wnews', '--mode test -em paragram'], type=str)
+    arg('--main_args', '-a', nargs='+', default=["-em glove -t whitespace"], type=str)
     args = parser.parse_args()
     return args
 
@@ -1618,3 +1634,6 @@ if __name__ == '__main__':
         record_dirs.append(record_dir)
     ens = Ensemble(record_dirs, args.k, model_args='paths')
     ens(args)
+
+# '--mode test -em glove', '--mode test -em wnews', '--mode test -em paragram'
+# "-es 3 -e 8 -em wnews -hd 150 -we 10 --lrstep 10 -mv 700000", "-e 5 -hd 150 -mv 1500000", "-e 8 -hd 150 -em paragram -us 0 -mv 1200000"
