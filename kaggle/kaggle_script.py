@@ -47,6 +47,7 @@ import pandas as pd
 import os
 import csv
 from sklearn.metrics import f1_score
+from gensim.models import KeyedVectors
 # list of possible models for ensemble
 
 
