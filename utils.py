@@ -48,7 +48,7 @@ def get_hash():
 
 def str_date_time():
     struct_time = time.localtime()
-    date_time = time.strftime('%b_%d_%Y__%H:%M:%S', struct_time)
+    date_time = time.strftime('%b_%d_%Y__%H_%M_%S', struct_time)
     return date_time
 
 
