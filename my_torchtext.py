@@ -158,7 +158,7 @@ def emb_from_txt(path, ext, max_vectors):
 
         itos, vectors, dim = [], torch.zeros((max_vectors, dim)), None
 
-        for line in tqdm(f, total=num_lines):
+        for line in f:
             # Explicitly splitting on " " is important, so we don't
             # get rid of Unicode non-breaking spaces in the vectors.
             entries = line.rstrip().split(b" ")
