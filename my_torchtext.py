@@ -42,7 +42,9 @@ class MyTabularDataset(TabularDataset):
                                                         for index in [train_index, val_index, test_index])
                 splits = tuple(Dataset(d, self.fields)
                                for d in (train_data, val_data, test_data) if d)
-
+                val_toxic_percent = sum([int(e.target) for e in val_data])/len(val_data)
+                train_toxic_percent = sum([int(e.target) for e in train_data]) / len(train_data)
+                print(train_toxic_percent*100, '% ', val_toxic_percent * 100, '% ')
                 # In case the parent sort key isn't none
                 if self.sort_key:
                     for subset in splits:
