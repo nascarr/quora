@@ -34,6 +34,7 @@ def parse_main_args(main_args=None):
     arg('--no_cache', action='store_true')
     arg('--var_length', '-vl', action = 'store_false') # variable sequence length in batches
     arg('--unk_std', '-us', default = 0.001, type=float)
+    arg('--stratified', '-s', action='store_true')
 
     # training params
     arg('--optim', '-o', default='Adam', choices=['Adam', 'AdamW'])
@@ -122,7 +123,7 @@ def job(args, train_csv, test_csv, embedding, cache):
     data.embedding_lookup(embedding, args.unk_std, args.max_vectors, to_cache)
 
     # split train dataset
-    data_iter = data.split(args.kfold, args.split_ratio, args.test, args.seed)
+    data_iter = data.split(args.kfold, args.split_ratio, args.stratified, args.test, args.seed)
 
     # iterate through folds
     loss_function = nn.BCEWithLogitsLoss()

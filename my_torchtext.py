@@ -8,9 +8,9 @@ import numpy as np
 class MyTabularDataset(TabularDataset):
     """Subclass of torch.data.dataset.TabularDataset for k-fold cross-validation"""
 
-    def split(self, split_ratio=0.8, stratified=False, strata_field='label',
+    def split(self, split_ratio=0.8, stratified=False, strata_field='target',
               random_state=None):
-        splits = super().split(split_ratio, stratified, strata_field, random_state)
+        splits = super().split(split_ratio, stratified=stratified, strata_field=strata_field, random_state=random_state)
         return [splits]
 
     def split_kfold(self, k, stratified=False, is_test=False, random_state=None):

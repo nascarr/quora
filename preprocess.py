@@ -57,12 +57,12 @@ class Data:
         print_duration(time_start, 'time for embedding lookup: ')
         return
 
-    def split(self, kfold, split_ratio, is_test, seed):
+    def split(self, kfold, split_ratio, stratified, is_test, seed):
         random.seed(seed)
         if kfold:
             data_iter = self.train.split_kfold(kfold, is_test=is_test, random_state=random.getstate())
         else:
-            data_iter = self.train.split(split_ratio, random_state=random.getstate())
+            data_iter = self.train.split(split_ratio, stratified=stratified, random_state=random.getstate())
         return data_iter
 
 
