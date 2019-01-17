@@ -13,6 +13,7 @@ from create_test_datasets import reduce_embedding, reduce_datasets
 from learner import Learner, choose_thresh, val_pred_to_csv
 from preprocess import Data, iterate
 from utils import submit, check_changes_commited
+from ensemble import SnapshotEns
 
 
 def parse_main_args(main_args=None):
@@ -171,6 +172,7 @@ def main(main_args=None):
     args = parse_main_args(main_args)
     train_csv, test_csv, emb_path, cache = analyze_args(args)
     record_path = job(args, train_csv, test_csv, emb_path, cache)
+    SnapshotEns()()
     return record_path
 
 
