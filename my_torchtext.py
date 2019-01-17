@@ -25,17 +25,22 @@ class MyTabularDataset(TabularDataset):
                 split_data = list(zip(*fold_data))
                 split_data = [[e for g in data for e in g]
                                                    for data in split_data]
-                split_data = [data for data in split_data if len(data) > 0]
-                percents = [sum([int(e.target) for e in data]) / len(data)*100 for data in split_data]
-                print('percent of toxic questions for train_val_test data: ', percents)
-                splits = tuple(Dataset(d, self.fields) for d in split_data)
-                if self.sort_key:
-                    for subset in splits:
-                        subset.sort_key = self.sort_key
+                splits = self.make_datasets(split_data)
                 yield splits
         else:
-            return self.iter_folds(self.examples, k, rnd, is_test)
+            for fold_data in self.iter_folds(self.examples, k, rnd, is_test):
+                splits = self.make_datasets(fold_data)
+                yield splits
 
+    def make_datasets(self, split_data):
+        split_data = [data for data in split_data if len(data) > 0]
+        percents = [sum([int(e.target) for e in data]) / len(data) * 100 for data in split_data]
+        print('percent of toxic questions for train_val_test data: ', percents)
+        splits = tuple(Dataset(d, self.fields) for d in split_data)
+        if self.sort_key:
+            for subset in splits:
+                subset.sort_key = self.sort_key
+        return splits
 
     def iter_folds(self, examples, k, rnd, is_test):
         N = len(examples)
