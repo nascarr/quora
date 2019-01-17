@@ -51,7 +51,10 @@ class Ensemble:
         thresh, max_f1 = self.evaluate_ensemble(val_ens_prob, y_true, thresh)
         self.record(max_f1, thresh, method)
         # predict test labels and save submission
-        self.predict_test(method, thresh)
+        try:
+            self.predict_test(method, thresh)
+        except:
+            print("can't predict test data")
 
     def predict_test(self, method, thresh):
         y_preds = []
