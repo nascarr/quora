@@ -4,6 +4,8 @@ from torchtext.data.dataset import *
 from torchtext.vocab import *
 import numpy as np
 import itertools
+from utils import print_duration
+import time
 
 
 class MyTabularDataset(TabularDataset):
@@ -45,12 +47,12 @@ class MyTabularDataset(TabularDataset):
             train_index, val_index, test_index = k_split_indices(randperm, cut_idxs, k, i, is_test)
             train_data, val_data, test_data = tuple([examples[idx] for idx in index]
                                                     for index in [train_index, val_index, test_index])
-
-
             i += 1
             yield train_data, val_data, test_data
 
+
 def k_split_indices(randperm, cut_idxs, k, i, is_test):
+    time_start = time.time()
 
     # val index
     val_start_idx = cut_idxs[i]
@@ -68,9 +70,11 @@ def k_split_indices(randperm, cut_idxs, k, i, is_test):
         test_index = randperm[test_start_idx:test_end_idx]
     else:
         test_index = []
-    val_test_index = val_index + test_index
+    val_test_index = set(val_index + test_index)
     # train index
+    print_duration(time_start, message='k_split_indices time')
     train_index = [idx for idx in randperm if idx not in val_test_index]
+    print_duration(time_start, message='k_split_indices time')
     return train_index, val_index, test_index
 
 
