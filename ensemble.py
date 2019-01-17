@@ -135,6 +135,7 @@ def ens_parser(add_help=True):
     parser = argparse.ArgumentParser(add_help=add_help)
     arg = parser.add_argument
     arg('--models', '-m', nargs='+', type=str, default=['glove', 'wnews', 'paragram'])
+    arg('--model_args', '-ma', type=str, default='names', choices=['names', 'dirs', 'paths'])
     arg('-k', action='store_true')
     arg('--method', '-mth', default='mean', type=str, choices=['mean', 'weight', 'stack'])
     arg('--weights', '-w', nargs='+', default=[0.9, 0.1], type=float)
@@ -147,8 +148,14 @@ def parse_ens_args():
     args = parser.parse_args()
     return args
 
+
 if __name__ == '__main__':
     args = parse_ens_args()
-    ens = Ensemble.from_names(args.models)
-    ens(args.method, args.thresh)
+    if args.model_args == 'names':
+        ens = Ensemble.from_names(args.models)
+    elif args.model_args == 'dirs':
+        ens = Ensemble.from_dirs(args.models)
+    else:
+        ens = Ensemble(args.models)
+    ens(args.method, args.thresh, args)
 
