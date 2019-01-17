@@ -3,6 +3,7 @@ from gensim.models import KeyedVectors
 from torchtext.data.dataset import *
 from torchtext.vocab import *
 import numpy as np
+import itertools
 
 
 class MyTabularDataset(TabularDataset):
@@ -13,59 +14,71 @@ class MyTabularDataset(TabularDataset):
         splits = super().split(split_ratio, stratified=stratified, strata_field=strata_field, random_state=random_state)
         return [splits]
 
-    def split_kfold(self, k, stratified=False, is_test=False, random_state=None):
-        def _iter_folds():
-            i = 0
-            while i < k:
-                # val index
-                val_start_idx = cut_idxs[i]
-                val_end_idx = cut_idxs[i + 1]
-                val_index = randperm[val_start_idx:val_end_idx]
-
-                # test index
-                if is_test:
-                    if i <= k - 2:
-                        test_start_idx = cut_idxs[i + 1]
-                        test_end_idx = cut_idxs[i + 2]
-                    else:
-                        test_start_idx = cut_idxs[0]
-                        test_end_idx = cut_idxs[1]
-                    test_index = randperm[test_start_idx:test_end_idx]
-                else:
-                    test_index = []
-
-                # train index
-                train_index = list(set(randperm) - set(test_index) - set(val_index))
-
-                # split examples by index and create datasets
-                train_data, val_data, test_data = tuple([self.examples[idx] for idx in index]
-                                                        for index in [train_index, val_index, test_index])
-                splits = tuple(Dataset(d, self.fields)
-                               for d in (train_data, val_data, test_data) if d)
-                val_toxic_percent = sum([int(e.target) for e in val_data])/len(val_data)
-                train_toxic_percent = sum([int(e.target) for e in train_data]) / len(train_data)
-                print(train_toxic_percent*100, '% ', val_toxic_percent * 100, '% ')
-                # In case the parent sort key isn't none
+    def split_kfold(self, k, stratified=False, strata_field='target', is_test=False, random_state=None):
+        rnd = RandomShuffler(random_state)
+        if stratified:
+            strata = stratify(self.examples, strata_field)
+            group_generators = [self.iter_folds(group, k, rnd, is_test) for group in strata]
+            for fold_data in zip(*group_generators):
+                split_data = list(zip(*fold_data))
+                split_data = [[e for g in data for e in g]
+                                                   for data in split_data]
+                split_data = [data for data in split_data if len(data) > 0]
+                percents = [sum([int(e.target) for e in data]) / len(data)*100 for data in split_data]
+                print('percent of toxic questions for train_val_test data: ', percents)
+                splits = tuple(Dataset(d, self.fields) for d in split_data)
                 if self.sort_key:
                     for subset in splits:
                         subset.sort_key = self.sort_key
-                i += 1
                 yield splits
+        else:
+            return self.iter_folds(self.examples, k, rnd, is_test)
 
-        rnd = RandomShuffler(random_state)
-        N = len(self.examples)
+
+    def iter_folds(self, examples, k, rnd, is_test):
+        N = len(examples)
         randperm = rnd(range(N))
-        fold_len = int(N/k)
+        fold_len = int(N / k)
         cut_idxs = [e * fold_len for e in list(range(k))] + [N]
-        data_iter = _iter_folds()
-        return data_iter
+        i = 0
+        while i < k:
+            train_index, val_index, test_index = k_split_indices(randperm, cut_idxs, k, i, is_test)
+            train_data, val_data, test_data = tuple([examples[idx] for idx in index]
+                                                    for index in [train_index, val_index, test_index])
+
+
+            i += 1
+            yield train_data, val_data, test_data
+
+def k_split_indices(randperm, cut_idxs, k, i, is_test):
+
+    # val index
+    val_start_idx = cut_idxs[i]
+    val_end_idx = cut_idxs[i + 1]
+    val_index = randperm[val_start_idx:val_end_idx]
+
+    # test index
+    if is_test:
+        if i <= k - 2:
+            test_start_idx = cut_idxs[i + 1]
+            test_end_idx = cut_idxs[i + 2]
+        else:
+            test_start_idx = cut_idxs[0]
+            test_end_idx = cut_idxs[1]
+        test_index = randperm[test_start_idx:test_end_idx]
+    else:
+        test_index = []
+    val_test_index = val_index + test_index
+    # train index
+    train_index = [idx for idx in randperm if idx not in val_test_index]
+    return train_index, val_index, test_index
 
 
 class MyVectors(Vectors):
-    #def __init__(self, *args, **kwargs):
+    # def __init__(self, *args, **kwargs):
     #    self.tokens = 0
     #    super(MyVectors, self).__init__(*args, *kwargs)
-    def __init__(self, name, cache=None, to_cache = True,
+    def __init__(self, name, cache=None, to_cache=True,
                  url=None, unk_init=None, max_vectors=None):
         """
         Arguments:
@@ -94,14 +107,13 @@ class MyVectors(Vectors):
         else:
             self.load(name, max_vectors=max_vectors)
 
-
     def __getitem__(self, token):
         if token in self.stoi:
-            #self.tokens += 1
-            #print(self.tokens, self.low_tokens)
+            # self.tokens += 1
+            # print(self.tokens, self.low_tokens)
             return self.vectors[self.stoi[token]]
         elif token.lower() in self.stoi:
-            #self.low_tokens += 1
+            # self.low_tokens += 1
             return self.vectors[self.stoi[token.lower()]]
         else:
             return self.unk_init(torch.Tensor(self.dim))
@@ -238,11 +250,12 @@ def emb_from_txt(path, ext, max_vectors):
 
 
 def emb_from_bin(path, max_vectors):
-    emb_index = KeyedVectors.load_word2vec_format(path, limit = max_vectors, binary=True)
+    emb_index = KeyedVectors.load_word2vec_format(path, limit=max_vectors, binary=True)
     itos = emb_index.index2word
     vectors = emb_index.vectors
     dim = emb_index.vector_size
     return itos, vectors, dim
+
 
 def _infer_shape(f):
     num_lines, vector_dim = 0, None

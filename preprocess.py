@@ -60,9 +60,9 @@ class Data:
     def split(self, kfold, split_ratio, stratified, is_test, seed):
         random.seed(seed)
         if kfold:
-            data_iter = self.train.split_kfold(kfold, is_test=is_test, random_state=random.getstate())
+            data_iter = self.train.split_kfold(kfold, is_test=is_test, stratified=stratified, strata_field='target', random_state=random.getstate())
         else:
-            data_iter = self.train.split(split_ratio, stratified=stratified, random_state=random.getstate())
+            data_iter = self.train.split(split_ratio, stratified=stratified, strata_field='target', random_state=random.getstate())
         return data_iter
 
 
