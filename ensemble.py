@@ -15,7 +15,7 @@ class Ensemble:
 
     ens_record_path = 'notes/ensemble.csv'
 
-    def __init__(self, val_pred_paths, test_pred_paths, pred_dirs=None):
+    def __init__(self, val_pred_paths, test_pred_paths=None, pred_dirs=None):
         self.val_pred_paths = val_pred_paths
         self.test_pred_paths = test_pred_paths
         self.pred_dirs = [os.path.dirname(p) for p in self.val_pred_paths] if not pred_dirs else pred_dirs
@@ -34,10 +34,7 @@ class Ensemble:
         test_pred_paths = [get_pred_path(d, 'test_probs.csv', model_args=model_args) for d in model_dirs]
         return cls(val_pred_paths, test_pred_paths, model_dirs)
 
-    def __call__(self, args):
-        thresh = args.thresh
-        method = args.method
-
+    def __call__(self, method, thresh, method_params=None):
         # find best method parameters based on validation data
         y_preds = []
         last_ids = None
@@ -47,7 +44,7 @@ class Ensemble:
             if last_ids:
                 if last_ids != ids:
                     raise Exception('Prediction ids should be the same for ensemble')
-        val_ens_prob = methods[method](y_preds, args) # target probability after ensembling
+        val_ens_prob = methods[method](y_preds, method_params) # target probability after ensembling
         thresh, max_f1 = self.evaluate_ensemble(val_ens_prob, y_true, thresh)
         self.record(max_f1, thresh, method)
         # predict test labels and save submission
@@ -153,5 +150,5 @@ def parse_ens_args():
 if __name__ == '__main__':
     args = parse_ens_args()
     ens = Ensemble.from_names(args.models)
-    ens(args)
+    ens(args.method, args.thresh)
 
