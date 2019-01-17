@@ -91,14 +91,6 @@ class Ensemble:
         dict_to_csv(ens_info, self.ens_record_path, 'a', 'columns', reverse=False, header=True)
 
 
-def val_pred_to_csv(ids, y_pred, y_true, fname='val_probs.csv'):
-    df = pd.DataFrame()
-    df['qid'] = ids
-    df['prediction'] = y_pred
-    df['true_label'] = y_true
-    df.to_csv(fname, index=False)
-
-
 def get_pred_path(m, pred_file_name, model_args='names'):
     if model_args == 'names':
         path = os.path.join('./models', model_dict[m][0], pred_file_name)

@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 import torch
 import torch.nn as nn
 import os
@@ -96,7 +97,8 @@ class Learner:
                         train_loss = np.mean(losses)
 
                         # val evaluation
-                        val_loss, val_f1 = self.evaluate(self.val_dl, tresh)
+                        val_loss, val_f1, val_ids, val_prob, val_true = self.evaluate(self.val_dl, tresh)
+                        val_pred_to_csv(val_ids, val_prob, val_true, f'val_probs_{int(step/eval_every) - 1}.csv')
                         self.recorder.val_record.append({'step': step, 'loss': val_loss, 'f1': val_f1})
                         info = {'best_ep': e, 'step': step, 'train_loss': train_loss,
                                 'val_loss': val_loss, 'val_f1': val_f1}
@@ -128,7 +130,7 @@ class Learner:
         self.model, info = self.recorder.load(message = 'best model:')
 
         # final train evaluation
-        train_loss, train_f1 = self.evaluate(self.train_dl, tresh)
+        train_loss, train_f1, _, _, _ = self.evaluate(self.train_dl, tresh)
         tr_info = {'train_loss':train_loss, 'train_f1':train_f1}
         self.recorder.append_info(tr_info, message='train loss and f1:')
 
@@ -143,19 +145,26 @@ class Learner:
             tp = 0
             n_targs = 0
             n_preds = 0
+            probs = []
+            targs = []
+            ids = []
             for batch in iter(dl):
                 model_input = self.to_cuda(batch.text)
                 y = batch.target.type(torch.Tensor).cuda()
                 pred = self.model.forward(*model_input).view(-1)
                 loss.append(self.loss_func(pred, y).cpu().data.numpy())
-                label = (torch.sigmoid(pred).cpu().data.numpy() > tresh).astype(int)
+                prob = torch.sigmoid(pred).cpu().data.numpy()
+                label = (prob > tresh).astype(int)
                 y = y.cpu().data.numpy()
                 tp += sum(y + label == 2)
                 n_targs += sum(y)
                 n_preds += sum(label)
+                probs += prob.tolist()
+                targs += y.tolist()
+                ids += batch.qid.view(-1).data.numpy().tolist()
             f1 = f1_metric(tp, n_targs, n_preds)
             loss = np.mean(loss)
-        return loss, f1
+        return loss, f1, ids, probs, targs
 
     def predict_probs(self, is_test=False):
         if is_test:
@@ -278,7 +287,7 @@ class Recorder:
 
         # copy all records to subdir
         png_files = ['val_loss.png', 'val_f1.png'] if not self.args.test else ['loss.png', 'f1.png']
-        csv_files = ['val_probs.csv', 'train_steps.csv', 'submission.csv', 'test_probs.csv']
+        csv_files = ['val_probs*.csv', 'train_steps.csv', 'submission.csv', 'test_probs.csv']
         copy_files([*png_files, 'models/*.info', *csv_files], subdir)
         return subdir
 
@@ -306,3 +315,11 @@ def choose_thresh(probs, true, thresh_range, message=True):
         print('best threshold is {:.4f} with F1 score: {:.4f}'.format(th, tmp[2]))
 
     return th, tmp[2]
+
+
+def val_pred_to_csv(ids, y_pred, y_true, fname='val_probs.csv'):
+    df = pd.DataFrame()
+    df['qid'] = ids
+    df['prediction'] = y_pred
+    df['true_label'] = y_true
+    df.to_csv(fname, index=False)

@@ -10,8 +10,7 @@ import torch.optim as optim
 
 from choose import choose_tokenizer, choose_model, choose_optimizer
 from create_test_datasets import reduce_embedding, reduce_datasets
-from ensemble import val_pred_to_csv
-from learner import Learner, choose_thresh
+from learner import Learner, choose_thresh, val_pred_to_csv
 from preprocess import Data, iterate
 from utils import submit, check_changes_commited
 
@@ -158,7 +157,7 @@ def job(args, train_csv, test_csv, embedding, cache):
         # predict test labels
         test_label, test_prob,_, test_ids, tresh = learn.predict_labels(is_test=True, thresh=args.f1_tresh)
         if args.test:
-            test_loss, test_f1 = learn.evaluate(learn.test_dl, args.f1_tresh)
+            test_loss, test_f1, _, _, _ = learn.evaluate(learn.test_dl, args.f1_tresh)
             learn.recorder.append_info({'test_loss': test_loss, 'test_f1': test_f1}, message='Test set results: ')
 
         # save test predictions to submission.csv
