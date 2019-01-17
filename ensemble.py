@@ -15,10 +15,24 @@ class Ensemble:
 
     ens_record_path = 'notes/ensemble.csv'
 
-    def __init__(self, models, is_kfold=False, model_args='names'):
-        self.val_pred_paths = [get_pred_path(m, 'val_probs.csv', model_args) for m in models]
-        self.test_pred_paths = [get_pred_path(m, 'test_probs.csv', model_args) for m in models]
-        self.pred_dirs = [get_pred_dir(m, model_args) for m in models]
+    def __init__(self, val_pred_paths, test_pred_paths, pred_dirs=None):
+        self.val_pred_paths = val_pred_paths
+        self.test_pred_paths = test_pred_paths
+        self.pred_dirs = [os.path.dirname(p) for p in self.val_pred_paths] if not pred_dirs else pred_dirs
+
+    @classmethod
+    def from_names(cls, model_names):
+        model_args = 'names'
+        val_pred_paths = [get_pred_path(m, 'val_probs.csv', model_args=model_args) for m in model_names]
+        test_pred_paths = [get_pred_path(m, 'test_probs.csv', model_args=model_args) for m in model_names]
+        return cls(val_pred_paths, test_pred_paths)
+
+    @classmethod
+    def from_dirs(cls, model_dirs):
+        model_args = 'dirs'
+        val_pred_paths = [get_pred_path(d, 'val_probs.csv', model_args=model_args) for d in model_dirs]
+        test_pred_paths = [get_pred_path(d, 'test_probs.csv', model_args=model_args) for d in model_dirs]
+        return cls(val_pred_paths, test_pred_paths, model_dirs)
 
     def __call__(self, args):
         thresh = args.thresh
@@ -36,8 +50,10 @@ class Ensemble:
         val_ens_prob = methods[method](y_preds, args) # target probability after ensembling
         thresh, max_f1 = self.evaluate_ensemble(val_ens_prob, y_true, thresh)
         self.record(max_f1, thresh, method)
-
         # predict test labels and save submission
+        self.predict_test(method, thresh)
+
+    def predict_test(self, method, thresh):
         y_preds = []
         last_ids = None
         for pp in self.test_pred_paths:
@@ -49,7 +65,6 @@ class Ensemble:
         test_ens_prob = methods[method](y_preds, args)  # target probability after ensembling
         test_ens_label = (test_ens_prob > thresh).astype(int)
         submit(ids, test_ens_label, test_ens_prob)
-
 
     @staticmethod
     def evaluate_ensemble(final_pred, true, thresh):
@@ -92,19 +107,19 @@ class Ensemble:
 
 
 def get_pred_path(m, pred_file_name, model_args='names'):
-    if model_args == 'names':
-        path = os.path.join('./models', model_dict[m][0], pred_file_name)
-    elif model_args == 'paths':
-        path = os.path.join(m, pred_file_name)
+    dir = get_pred_dir(m, model_args)
+    path = os.path.join(dir, pred_file_name)
     return path
 
 
 def get_pred_dir(m, model_args='names'):
     if model_args == 'names':
-        path = os.path.join('./models', model_dict[m][0])
-    elif model_args == 'paths':
-        path = m
-    return path
+        dir = os.path.join('./models', model_dict[m][0])
+    elif model_args == 'dirs':
+        dir = m
+    else:
+        raise Exception('model_args should be names or dirs')
+    return dir
 
 
 def load_pred_from_csv(pred_path, is_label=True):
@@ -134,6 +149,6 @@ def parse_ens_args():
 
 if __name__ == '__main__':
     args = parse_ens_args()
-    ens = Ensemble(args.models, args.k)
+    ens = Ensemble.from_names(args.models)
     ens(args)
 
