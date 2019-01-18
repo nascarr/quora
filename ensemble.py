@@ -44,7 +44,7 @@ class Ensemble:
             if last_ids:
                 if last_ids != ids:
                     raise Exception('Prediction ids should be the same for ensemble')
-        val_ens_prob = methods[method](y_preds, method_params) # target probability after ensembling
+        val_ens_prob = methods[method](y_preds, y_true, method_params) # target probability after ensembling
         thresh, max_f1 = self.evaluate_ensemble(val_ens_prob, y_true, thresh)
         self.record(max_f1, thresh, method)
         # predict test labels and save submission
@@ -138,7 +138,7 @@ def ens_parser(add_help=True):
     arg('--model_args', '-ma', type=str, default='names', choices=['names', 'dirs', 'paths'])
     arg('-k', action='store_true')
     arg('--method', '-mth', default='mean', type=str, choices=['mean', 'weight', 'stack'])
-    arg('--weights', '-w', nargs='+', default=[0.9, 0.1], type=float)
+    arg('--weights', '-w', nargs='+', default=None, type=float)
     arg('--thresh', '-th', nargs='+', default=[0.1, 0.5, 0.01], type=float)
     return parser
 
