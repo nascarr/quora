@@ -9,10 +9,10 @@ from learner import format_info, choose_thresh
 from ens_methods import methods
 from sklearn.metrics import f1_score
 from utils import dict_to_csv, submit
+from learner import val_pred_to_csv
 
 
 class Ensemble:
-
     ens_record_path = 'notes/ensemble.csv'
 
     def __init__(self, val_pred_paths, test_pred_paths=None, pred_dirs=None):
@@ -34,6 +34,30 @@ class Ensemble:
         test_pred_paths = [get_pred_path(d, 'test_probs.csv', model_args=model_args) for d in model_dirs]
         return cls(val_pred_paths, test_pred_paths, model_dirs)
 
+    @classmethod
+    def from_cv(cls, single_model_dirs, k=5):
+        """ For each single_model_dir looks for k-1 additional model dirs created right after model_dir.
+        Then creates dir f'{single_model_dir}_cv' and creates in this dir 2 csv files val_probs_cv.csv" and test_probs_cv.csv.
+        Writes concatenation of k val_probs.csv and k test_probs.csv into these files."""
+        k_model_dirs = [find_k_dirs(d, k) for d in single_model_dirs]
+        val_cv_paths, test_cv_paths, cv_dirs = [], [], []
+        for dirs in k_model_dirs:
+            cv_dir = f'{k_model_dirs[0]}_cv'
+            val_cv_path = os.path.join(cv_dir, 'val_probs_cv.csv')
+            test_cv_path = os.path.join(cv_dir, 'test_probs_cv.csv')
+            cv_dirs.append(cv_dir)
+            val_cv_paths.append(val_cv_path)
+            test_cv_paths.append(test_cv_path)
+            mode = 'w'
+            for d in dirs:
+                val_data = load_pred_from_csv(os.path.join(d, 'val_probs.csv'))
+                test_data = load_pred_from_csv(os.path.join(d, 'test_probs.csv'), is_label=False)
+                val_pred_to_csv(*val_data, fpath='val_probs_cv.csv', mode=mode)
+                val_pred_to_csv(*test_data, fpath='test_probs_cv.csv', mode=mode)
+                if mode == 'w':
+                    mode = 'a'
+        return cls(val_cv_paths, test_cv_paths, cv_dirs)
+
     def __call__(self, method, thresh, method_params=None):
         # find best method parameters based on validation data
         y_preds = []
@@ -44,7 +68,7 @@ class Ensemble:
             if last_ids:
                 if last_ids != ids:
                     raise Exception('Prediction ids should be the same for ensemble')
-        val_ens_prob = methods[method](y_preds, y_true, method_params) # target probability after ensembling
+        val_ens_prob = methods[method](y_preds, y_true, method_params)  # target probability after ensembling
         thresh, max_f1 = self.evaluate_ensemble(val_ens_prob, y_true, thresh)
         self.record(max_f1, thresh, method)
         # predict test labels and save submission
@@ -88,11 +112,10 @@ class Ensemble:
                 descr[1].append(row[1])
         return descr
 
-
     def record(self, max_f1, tresh, method):
         ens_info = format_info({'max_f1': max_f1, 'tresh': tresh})
         ens_info = {'method': method, **ens_info}
-        model_infos = [] # partial model descriptions
+        model_infos = []  # partial model descriptions
         # copy partial models descriptions
         info_paths = [os.path.join(pp, 'info.csv') for pp in self.pred_dirs]
         for ip in info_paths:
@@ -104,6 +127,15 @@ class Ensemble:
             writer = csv.writer(f)
             writer.writerows(model_infos)
         dict_to_csv(ens_info, self.ens_record_path, 'a', 'columns', reverse=False, header=True)
+
+
+def find_k_dirs(model_dir, k):
+    base_dir = os.path.dirname(model_dir)
+    all_dirs = [os.path.join(base_dir, d) for d in os.listdir(base_dir)]
+    all_dirs.sort(key=lambda x: os.path.getctime(x))
+    dir_idx = all_dirs.index(model_dir)
+    k_dirs = all_dirs[dir_idx:dir_idx + k]
+    return k_dirs
 
 
 def get_pred_path(m, pred_file_name, model_args='names'):
@@ -135,7 +167,7 @@ def ens_parser(add_help=True):
     parser = argparse.ArgumentParser(add_help=add_help)
     arg = parser.add_argument
     arg('--models', '-m', nargs='+', type=str, default=['glove', 'wnews', 'paragram'])
-    arg('--model_args', '-ma', type=str, default='names', choices=['names', 'dirs', 'paths'])
+    arg('--model_args', '-ma', type=str, default='names', choices=['names', 'dirs', 'paths', 'cv'])
     arg('-k', action='store_true')
     arg('--method', '-mth', default='mean', type=str, choices=['mean', 'weight', 'stack'])
     arg('--weights', '-w', nargs='+', default=None, type=float)
@@ -155,7 +187,8 @@ if __name__ == '__main__':
         ens = Ensemble.from_names(args.models)
     elif args.model_args == 'dirs':
         ens = Ensemble.from_dirs(args.models)
+    elif args.model_args == 'cv':
+        ens = Ensemble.from_cv(args.models)
     else:
         ens = Ensemble(args.models)
     ens(args.method, args.thresh, args)
-

@@ -317,9 +317,10 @@ def choose_thresh(probs, true, thresh_range, message=True):
     return th, tmp[2]
 
 
-def val_pred_to_csv(ids, y_pred, y_true, fname='val_probs.csv'):
+def val_pred_to_csv(ids, y_pred, y_true, fpath='val_probs.csv', mode='w'):
     df = pd.DataFrame()
     df['qid'] = ids
     df['prediction'] = y_pred
     df['true_label'] = y_true
-    df.to_csv(fname, index=False)
+    header = True if mode == 'w' else False
+    df.to_csv(fpath, index=False, mode=mode, header=header)
