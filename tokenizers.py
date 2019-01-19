@@ -87,3 +87,25 @@ class GNewsTokenizerNum(object):
     def __call__(self, x):
         return [self.tokenize_numbers(tok.text) for tok in self.tokenizer(x)]
 
+class GNewsTokenizerPhrase(object):
+    def __init__(self, emb_set):
+        self.spacy_en = spacy.load('en')
+        self.tokenizer = self.spacy_en.tokenizer
+        self.emb_set = emb_set
+        self.punct = '\\/.,();:!?"\'`'
+
+    def merge_phrase(self, x):
+        tokens = [t.strip(self.punct) for t in x.split()]
+        couples = ['_'.join(t) for t in zip(tokens[:-1], tokens[1:])]
+        triples = ['_'.join(t) for t in zip(tokens[:-2], tokens[1:-1], tokens[2:])]
+        for tr in triples:
+            if tr in self.emb_set:
+                x = x.replace(tr.replace('_', ' '), tr)
+        for c in couples:
+            if c in self.emb_set:
+                x = x.replace(c.replace('_', ' '), c)
+        return x
+
+    def __call__(self, x):
+        return [tok.text for tok in self.tokenizer(self.merge_phrase(x))]
+

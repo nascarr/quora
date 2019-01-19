@@ -1,22 +1,6 @@
 # functions for choosing tokenizer, optimizer and model
-from tokenizers import *
 import models
 import torch.optim as optim
-
-
-def choose_tokenizer(tokenizer):
-    if tokenizer == 'whitespace':
-        return WhitespaceTokenizer()
-    elif tokenizer == 'custom':
-        return CustomTokenizer()
-    elif tokenizer == 'lowerspacy':
-        return LowerSpacy()
-    elif tokenizer == 'gnews_sw':
-        return GNewsTokenizerSW()
-    elif tokenizer == 'gnews_num':
-        return GNewsTokenizerNum()
-    else:
-        return tokenizer
 
 
 def choose_model(model_name, text, n_layers, hidden_dim, dropout):

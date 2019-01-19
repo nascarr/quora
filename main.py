@@ -8,7 +8,7 @@ import sys
 import torch.nn as nn
 import torch.optim as optim
 
-from choose import choose_tokenizer, choose_model, choose_optimizer
+from choose import choose_model, choose_optimizer
 from create_test_datasets import reduce_embedding, reduce_datasets
 from learner import Learner, choose_thresh, val_pred_to_csv
 from preprocess import Data, iterate
@@ -28,7 +28,7 @@ def parse_main_args(main_args=None):
     arg('--split_ratio', '-sr', nargs='+', default=[0.8], type=float)
     arg('--test', action='store_true') # if present split data in train-val-test else split train-val
     arg('--seed', default=2018, type=int)
-    arg('--tokenizer', '-t', default='spacy', choices=['spacy', 'whitespace', 'custom', 'lowerspacy', 'gnews_sw', 'gnews_num'])
+    arg('--tokenizer', '-t', default='spacy')
     arg('--embedding', '-em', default='glove', choices=['glove', 'gnews', 'paragram', 'wnews'])
     arg('--max_vectors', '-mv', default=5000000, type=int)
     arg('--no_cache', action='store_true')
@@ -49,9 +49,7 @@ def parse_main_args(main_args=None):
     arg('--clip', type=float, default=1, help='gradient clipping')
 
     # model params
-    arg('--model', '-m', default='BiLSTMPool', choices=['BiLSTM', 'BiGRU', 'BiLSTMPool', 'BiLSTM_2FC', 'BiGRUPool',
-                                                    'BiGRUPool_2FC', 'BiLSTMPool_2FC', 'BiLSTMPoolFast', 'BiLSTMPoolOld',
-                                                    'BiLSTMPoolTest'])
+    arg('--model', '-m', default='BiLSTMPool')
     arg('--n_layers', '-n', default=2, type=int, help='Number of layers in model')
     arg('--hidden_dim', '-hd', type=int, default=100)
     arg('--dropout', '-d', type=float, default=0.2)
@@ -118,9 +116,10 @@ def job(args, train_csv, test_csv, embedding, cache):
     data = Data(train_csv, test_csv, cache)
 
     # read and preprocess data
-    data.preprocess(args.tokenizer, args.var_length)
     to_cache = not args.no_cache
-    data.embedding_lookup(embedding, args.unk_std, args.max_vectors, to_cache)
+    data.read_embedding(embedding, args.unk_std, args.max_vectors, to_cache)
+    data.preprocess(args.tokenizer, args.var_length)
+    data.embedding_lookup()
 
     # split train dataset
     data_iter = data.split(args.kfold, args.split_ratio, args.stratified, args.test, args.seed)
