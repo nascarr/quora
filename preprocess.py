@@ -40,6 +40,9 @@ class Data:
         elif tokenizer == 'gnews_ph':
             emb_set = set(self.vectors.itos)
             return GNewsTokenizerPhrase(emb_set)
+        elif tokenizer == 'gnews_ph_num':
+            emb_set = set(self.vectors.itos)
+            return GNewsTokenizerPhraseNum(emb_set)
         else:
             return tokenizer
 

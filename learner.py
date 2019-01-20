@@ -1,15 +1,13 @@
 import numpy as np
-import pandas as pd
 import torch
 import torch.nn as nn
 import os
 from sklearn.metrics import f1_score
 import warnings
-import shutil
 import time
-import subprocess
 import sys
-from utils import f1_metric, print_duration, get_hash, str_date_time, dict_to_csv, save_plot, copy_files, save_plots
+from utils import f1_metric, print_duration, get_hash, str_date_time, dict_to_csv, save_plot, copy_files, save_plots, \
+    pred_to_csv
 
 
 class Learner:
@@ -98,7 +96,7 @@ class Learner:
 
                         # val evaluation
                         val_loss, val_f1, val_ids, val_prob, val_true = self.evaluate(self.val_dl, tresh)
-                        val_pred_to_csv(val_ids, val_prob, val_true, f'val_probs_{int(step/eval_every) - 1}.csv')
+                        pred_to_csv(val_ids, val_prob, val_true, f'val_probs_{int(step / eval_every) - 1}.csv')
                         self.recorder.val_record.append({'step': step, 'loss': val_loss, 'f1': val_f1})
                         info = {'best_ep': e, 'step': step, 'train_loss': train_loss,
                                 'val_loss': val_loss, 'val_f1': val_f1}
@@ -317,10 +315,3 @@ def choose_thresh(probs, true, thresh_range, message=True):
     return th, tmp[2]
 
 
-def val_pred_to_csv(ids, y_pred, y_true, fpath='val_probs.csv', mode='w'):
-    df = pd.DataFrame()
-    df['qid'] = ids
-    df['prediction'] = y_pred
-    df['true_label'] = y_true
-    header = True if mode == 'w' else False
-    df.to_csv(fpath, index=False, mode=mode, header=header)

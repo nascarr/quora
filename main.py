@@ -10,10 +10,9 @@ import torch.optim as optim
 
 from choose import choose_model, choose_optimizer
 from create_test_datasets import reduce_embedding, reduce_datasets
-from learner import Learner, choose_thresh, val_pred_to_csv
+from learner import Learner, choose_thresh
 from preprocess import Data, iterate
-from utils import submit, check_changes_commited
-from ensemble import Ensemble
+from utils import submit, check_changes_commited, pred_to_csv
 
 
 def parse_main_args(main_args=None):
@@ -148,7 +147,7 @@ def job(args, train_csv, test_csv, embedding, cache):
         # save val predictions
         y_pred, y_true, ids = learn.predict_probs()
         val_ids = [data.qid.vocab.itos[i] for i in ids]
-        val_pred_to_csv(val_ids, y_pred, y_true)
+        pred_to_csv(val_ids, y_pred, y_true)
         # choose best threshold for val predictions
         best_th, max_f1 = choose_thresh(y_pred, y_true, [0.1, 0.5, 0.01], message=True)
         learn.recorder.append_info({'best_th': best_th, 'max_f1': max_f1})
