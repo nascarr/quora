@@ -17,7 +17,7 @@ def _submit(test_ids, predictoins, subm_name):
 
 def submit(test_ids, labels, probs, subm_name='submission.csv'):
     _submit(test_ids, labels, subm_name)
-    pred_to_csv(test_ids, probs, labels, 'test_probs.csv')
+    _submit(test_ids, probs, 'test_probs.csv')
     print(f'predictions saved in {subm_name}, test_probs.csv file')
 
 
@@ -104,12 +104,3 @@ def copy_files(arg_list, dest_dir):
     for a in arg_list:
         for file in glob.glob(a):
             shutil.copy(file, dest_dir)
-
-
-def pred_to_csv(ids, y_pred, y_true, fpath='val_probs.csv', mode='w'):
-    df = pd.DataFrame()
-    df['qid'] = ids
-    df['prediction'] = y_pred
-    df['true_label'] = y_true
-    header = True if mode == 'w' else False
-    df.to_csv(fpath, index=False, mode=mode, header=header)

@@ -20,6 +20,4 @@ def corr(first_model, second_model):
   print("Kendall's correlation score: {}".format(first_df[prediction].corr(second_df[prediction],method='kendall')))
   print("Spearman's correlation score: {}".format(first_df[prediction].corr(second_df[prediction],method='spearman')))
 
-if __name__ == '__main__':
-
-  corr(first_file, second_file)
+corr(first_file, second_file)
