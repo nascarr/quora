@@ -8,7 +8,8 @@ first_file = sys.argv[1]
 second_file = sys.argv[2]
 
 def corr(first_model, second_model):
-  first_path, second_path = [get_pred_path(m) for m in [first_model, second_model]]
+  pred_file_name = 'val_probs.csv'
+  first_path, second_path = [get_pred_path(m, pred_file_name) for m in [first_model, second_model]]
   first_df = pd.read_csv(first_path,index_col=0)
   second_df = pd.read_csv(second_path,index_col=0)
   # assuming first column is `prediction_id` and second column is `prediction`
@@ -21,5 +22,4 @@ def corr(first_model, second_model):
   print("Spearman's correlation score: {}".format(first_df[prediction].corr(second_df[prediction],method='spearman')))
 
 if __name__ == '__main__':
-
   corr(first_file, second_file)

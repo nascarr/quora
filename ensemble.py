@@ -5,6 +5,7 @@ import pandas as pd
 from ens_model_list import model_dict
 import os
 import csv
+import numpy as np
 from learner import format_info, choose_thresh
 from ens_methods import methods
 from sklearn.metrics import f1_score
@@ -51,17 +52,18 @@ class Ensemble:
             test_cv_path = os.path.join(cv_dir, 'test_probs_cv.csv')
             val_cv_paths.append(val_cv_path)
             test_cv_paths.append(test_cv_path)
-            mode = 'w'
-            for d in dirs:
-                val_data = load_pred_from_csv(os.path.join(d, 'val_probs.csv'))
-                pred_to_csv(*val_data, fpath=val_cv_path, mode=mode)
-                try:
-                    test_data = load_pred_from_csv(os.path.join(d, 'test_probs.csv'))
-                    pred_to_csv(*test_data, fpath=test_cv_path, mode=mode)
-                except:
-                    'cant load test data'
-                if mode == 'w':
-                    mode = 'a'
+            if not os.path.exists(val_cv_path):
+                mode = 'w'
+                for d in dirs:
+                    val_data = load_pred_from_csv(os.path.join(d, 'val_probs.csv'))
+                    pred_to_csv(*val_data, fpath=val_cv_path, mode=mode)
+                    try:
+                        test_data = load_pred_from_csv(os.path.join(d, 'test_probs.csv'))
+                        pred_to_csv(*test_data, fpath=test_cv_path, mode=mode)
+                    except:
+                        'cant load test data'
+                    if mode == 'w':
+                        mode = 'a'
         return cls(val_cv_paths, test_cv_paths, single_model_dirs)
 
     def __call__(self, method, thresh, method_params=None):
@@ -71,9 +73,12 @@ class Ensemble:
         for pp in self.val_pred_paths:
             ids, y_prob, y_true = load_pred_from_csv(pp)
             y_preds.append(y_prob)
-            if last_ids:
-                if last_ids != ids:
+            if last_ids is None:
+                last_ids = ids
+            else:
+                if not np.array_equal(last_ids, ids):
                     raise Exception('Prediction ids should be the same for ensemble')
+
         val_ens_prob = methods[method](y_preds, y_true, method_params)  # target probability after ensembling
         thresh, max_f1 = self.evaluate_ensemble(val_ens_prob, y_true, thresh)
         self.record(max_f1, thresh, method)
@@ -90,7 +95,7 @@ class Ensemble:
             ids, y_prob, _ = load_pred_from_csv(pp)
             y_preds.append(y_prob)
             if last_ids:
-                if last_ids != ids:
+                if np.array_equal(last_ids, ids):
                     raise Exception('Prediction ids should be the same for ensemble')
         test_ens_prob = methods[method](y_preds, args)  # target probability after ensembling
         test_ens_label = (test_ens_prob > thresh).astype(int)
@@ -137,7 +142,8 @@ class Ensemble:
 
 def find_k_dirs(model_dir, k):
     head_dir = os.path.dirname(model_dir)
-    all_dirs = [os.path.join(head_dir, d) for d in os.listdir(head_dir)]
+    all_entries = [os.path.join(head_dir, d) for d in os.listdir(head_dir)]
+    all_dirs = [d for d in all_entries if os.path.isdir(d)]
     all_dirs.sort(key=lambda x: os.path.getctime(x))
     dir_idx = all_dirs.index(model_dir)
     k_dirs = all_dirs[dir_idx:dir_idx + k]

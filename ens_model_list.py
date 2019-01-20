@@ -15,4 +15,5 @@ model_dict = {
     'gnews_cv': ('Jan_18_2019__15_06_29', '-em gnews -es 2 -e 10 -hd 150 -us 0.1 -k 5 -ne 3'),  # 1113
     'gnews_num_cv': ('Jan_18_2019__16_45_38', '-em gnews -e 10 -hd 150 -us 0.1 -k 5 -ne 3 -t gnews_num'), # 1119
     'gnews_ph_cv': ('Jan_19_2019__16_05_11', '-em gnews -e 10 -hd 150 -ne 3 -t gnews_ph -k 5 -us 0.1'), #1189
+    'gnews_ph_num_cv': ('Jan_19_2019__18_56_02', '-em gnews -e 10 -hd 150 -ne 3 -t gnews_ph_num -k 5 -us 0.1'),  #1195
 }
