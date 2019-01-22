@@ -27,6 +27,7 @@ def f1_metric(tp, n_targs, n_preds):
     else:
         prec = tp/n_preds
         rec = tp/n_targs
+        print('prec: ', prec, 'rec: ', rec)
         f1 = 2 * rec * prec / (rec + prec)
     return f1
 
