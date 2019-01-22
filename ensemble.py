@@ -15,24 +15,25 @@ from utils import dict_to_csv, submit, pred_to_csv
 class Ensemble:
     ens_record_path = 'notes/ensemble.csv'
 
-    def __init__(self, val_pred_paths, test_pred_paths=None, pred_dirs=None):
+    def __init__(self, val_pred_paths, model_names, test_pred_paths=None, pred_dirs=None):
         self.val_pred_paths = val_pred_paths
         self.test_pred_paths = test_pred_paths
         self.pred_dirs = [os.path.dirname(p) for p in self.val_pred_paths] if not pred_dirs else pred_dirs
+        self.model_names = model_names
 
     @classmethod
     def from_names(cls, model_names):
         model_args = 'names'
         val_pred_paths = [get_pred_path(m, 'val_probs.csv', model_args=model_args) for m in model_names]
         test_pred_paths = [get_pred_path(m, 'test_probs.csv', model_args=model_args) for m in model_names]
-        return cls(val_pred_paths, test_pred_paths)
+        return cls(val_pred_paths, model_names=model_names, test_pred_paths = test_pred_paths)
 
     @classmethod
     def from_dirs(cls, model_dirs):
         model_args = 'dirs'
         val_pred_paths = [get_pred_path(d, 'val_probs.csv', model_args=model_args) for d in model_dirs]
         test_pred_paths = [get_pred_path(d, 'test_probs.csv', model_args=model_args) for d in model_dirs]
-        return cls(val_pred_paths, test_pred_paths, model_dirs)
+        return cls(val_pred_paths, model_dirs,test_pred_paths, model_dirs)
 
     @classmethod
     def from_cv(cls, models, k=5, model_args='names'):
@@ -64,7 +65,7 @@ class Ensemble:
                         'cant load test data'
                     if mode == 'w':
                         mode = 'a'
-        return cls(val_cv_paths, test_cv_paths, single_model_dirs)
+        return cls(val_cv_paths, models, test_cv_paths, single_model_dirs)
 
     def __call__(self, method, thresh, method_params=None):
         # find best method parameters based on validation data
@@ -80,6 +81,8 @@ class Ensemble:
                     raise Exception('Prediction ids should be the same for ensemble')
 
         val_ens_prob = methods[method](y_preds, y_true, method_params)  # target probability after ensembling
+        os.makedirs('./ensemble', exist_ok=True)
+        pred_to_csv(ids, val_ens_prob, y_true, fpath=os.path.join('./ensemble', ' '.join(self.model_names)))
         thresh, max_f1 = self.evaluate_ensemble(val_ens_prob, y_true, thresh)
         self.record(max_f1, thresh, method)
         # predict test labels and save submission
@@ -205,5 +208,5 @@ if __name__ == '__main__':
     elif args.model_args == 'dirs':
         ens = Ensemble.from_dirs(args.models)
     else:
-        ens = Ensemble(args.models)
+        ens = Ensemble(args.models, model_names=args.models)
     ens(args.method, args.thresh, args)
