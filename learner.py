@@ -51,8 +51,9 @@ class Learner:
         eval_every = int(len(list(iter(self.train_dl))) / n_eval)
 
         time_start = time.time()
+        self.scheduler.step()
         for e in range(epoch):
-            self.scheduler.step()
+            # self.scheduler.step()
             if e >= warmup_epoch:
                 if no_improve_in_previous_epoch:
                     no_improve_epoch += 1
@@ -89,7 +90,7 @@ class Learner:
                 self.optimizer.step()
 
                 if step % eval_every == 0:
-                    #self.scheduler.step()
+                    self.scheduler.step()
                     with torch.no_grad():
                         # train evaluation
                         losses.append(loss.cpu().data.numpy())
