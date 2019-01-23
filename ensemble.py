@@ -82,7 +82,10 @@ class Ensemble:
 
         val_ens_prob = methods[method](y_preds, y_true, method_params)  # target probability after ensembling
         os.makedirs('./ensemble', exist_ok=True)
-        pred_to_csv(ids, val_ens_prob, y_true, fpath=os.path.join('./ensemble', ' '.join(self.model_names)))
+        try:
+            pred_to_csv(ids, val_ens_prob, y_true, fpath=os.path.join('./ensemble', ' '.join(self.model_names)))
+        except:
+            print('cant save ensemble predictions for validation data')
         thresh, max_f1 = self.evaluate_ensemble(val_ens_prob, y_true, thresh)
         self.record(max_f1, thresh, method)
         # predict test labels and save submission
