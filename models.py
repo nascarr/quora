@@ -361,3 +361,87 @@ class BiLSTMPool_2FC(nn.Module):
         y = self.fc1(self.dropout(torch.cat((max_pool, average_pool, output), dim=1)))
         y = self.fc2(self.dropout(y))
         return y
+
+
+class LinPool(nn.Module):
+    # emb -> lin layer -> max, average pool -> lin layer -> label
+    def __init__(self, pretrained_lm, padding_idx, static=True, hidden_dim=100, lstm_layer=2, dropout=0.2):
+        super(LinPool, self).__init__()
+        self.hidden_dim = hidden_dim
+        self.num_layers = lstm_layer
+        self.dropout = nn.Dropout(p=dropout)
+        self.embedding = nn.Embedding.from_pretrained(pretrained_lm)
+        self.embedding.padding_idx = padding_idx
+        if static:
+            self.embedding.weight.requires_grad = False
+        self.fc1 = nn.Linear(self.embedding.embedding_dim, self.hidden_dim)
+        self.fc2 = nn.Linear(2 * self.hidden_dim + 1, 1)
+
+    def forward(self, sents, lengths=None):
+        x = self.embedding(sents)
+        x1 = self.fc1(x)
+        max_pool, _ = torch.max(x1, 1)
+        average_pool = torch.mean(x1, 1)
+        lengths = lengths.view(-1, 1).float()
+        long_output = torch.cat((max_pool, average_pool, lengths), dim=1)
+        y = self.fc2(self.dropout(long_output))
+        return y
+
+class LinPool4(nn.Module):
+    # 4 embeddings, lin layer for each embedding -> concat all ouptus -> max, average pool -> lin layer -> label
+    def __init__(self, pretrained_lm, padding_idx, static=True, hidden_dim=100, lstm_layer=2, dropout=0.2):
+        super(LinPool4, self).__init__()
+        self.hidden_dim = hidden_dim
+        self.num_layers = lstm_layer
+        self.dropout = nn.Dropout(p=dropout)
+        self.embedding = nn.Embedding.from_pretrained(pretrained_lm)
+        self.embedding.padding_idx = padding_idx
+        if static:
+            self.embedding.weight.requires_grad = False
+        self.fc1 = nn.Linear(300, self.hidden_dim)
+        self.fc2 = nn.Linear(300, self.hidden_dim)
+        self.fc3 = nn.Linear(300, self.hidden_dim)
+        self.fc4 = nn.Linear(300, self.hidden_dim)
+        self.fc5 = nn.Linear(2 * self.hidden_dim * self.embedding.embedding_dim//300, 1)
+
+    def forward(self, sents, lengths=None):
+        x0 = self.embedding(sents)
+        x1 = self.fc1(x0[:,:,:300])
+        x2 = self.fc2(x0[:,:,300:600])
+        x3 = self.fc3(x0[:,:,600:900])
+        x4 = self.fc4(x0[:,:,900:1200])
+        x_cat = torch.cat((x1, x2, x3, x4), dim=2)
+        max_pool, _ = torch.max(x_cat, 1)
+        average_pool = torch.mean(x_cat, 1)
+        long_output = torch.cat((max_pool, average_pool), dim=1)
+        y = self.fc5(self.dropout(long_output))
+        return y
+
+
+class LinPool3(nn.Module):
+    # 4 embeddings, lin layer for each embedding -> concat all ouptus -> max, average pool -> lin layer -> label
+    def __init__(self, pretrained_lm, padding_idx, static=True, hidden_dim=100, lstm_layer=2, dropout=0.2):
+        super(LinPool3, self).__init__()
+        self.hidden_dim = hidden_dim
+        self.num_layers = lstm_layer
+        self.dropout = nn.Dropout(p=dropout)
+        self.embedding = nn.Embedding.from_pretrained(pretrained_lm)
+        self.embedding.padding_idx = padding_idx
+        if static:
+            self.embedding.weight.requires_grad = False
+        self.fc1 = nn.Linear(300, self.hidden_dim)
+        self.fc2 = nn.Linear(300, self.hidden_dim)
+        self.fc3 = nn.Linear(300, self.hidden_dim)
+        self.fc4 = nn.Linear(2 * self.hidden_dim * self.embedding.embedding_dim//300, 1)
+
+    def forward(self, sents, lengths=None):
+        x0 = self.embedding(sents)
+        x1 = self.fc1(x0[:,:,:300])
+        x2 = self.fc2(x0[:,:,300:600])
+        x3 = self.fc3(x0[:,:,600:900])
+        x_cat = torch.cat((x1, x2, x3), dim=2)
+        max_pool, _ = torch.max(x_cat, 1)
+        average_pool = torch.mean(x_cat, 1)
+        long_output = torch.cat((max_pool, average_pool), dim=1)
+        y = self.fc4(self.dropout(long_output))
+        return y

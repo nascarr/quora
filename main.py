@@ -28,7 +28,7 @@ def parse_main_args(main_args=None):
     arg('--test', action='store_true') # if present split data in train-val-test else split train-val
     arg('--seed', default=2018, type=int)
     arg('--tokenizer', '-t', default='spacy')
-    arg('--embedding', '-em', default='glove', choices=['glove', 'gnews', 'paragram', 'wnews'])
+    arg('--embedding', '-em', default=['glove'], nargs='+', choices=['glove', 'gnews', 'paragram', 'wnews'])
     arg('--max_vectors', '-mv', default=5000000, type=int)
     arg('--no_cache', action='store_true')
     arg('--var_length', '-vl', action = 'store_false') # variable sequence length in batches
@@ -59,18 +59,22 @@ def parse_main_args(main_args=None):
         args = parser.parse_args()
     return args
 
+def get_emb_path(emb_name):
+    if emb_name == 'glove':
+        emb_path = 'glove.840B.300d/glove.840B.300d.txt'
+    elif emb_name == 'paragram':
+        emb_path = 'paragram_300_sl999/paragram_300_sl999.txt'
+    elif emb_name == 'gnews':
+        emb_path = 'GoogleNews-vectors-negative300/GoogleNews-vectors-negative300.bin'
+    elif emb_name == 'wnews':
+        emb_path = 'wiki-news-300d-1M/wiki-news-300d-1M.vec'
+    return emb_path
 
 def analyze_args(args):
-    if args.embedding == 'glove':
-        emb_path = 'glove.840B.300d/glove.840B.300d.txt'
-    elif args.embedding == 'paragram':
-        emb_path = 'paragram_300_sl999/paragram_300_sl999.txt'
-    elif args.embedding == 'gnews':
-        emb_path = 'GoogleNews-vectors-negative300/GoogleNews-vectors-negative300.bin'
-    elif args.embedding == 'wnews':
-        emb_path = 'wiki-news-300d-1M/wiki-news-300d-1M.vec'
-    # TODO: add other embeddings
-
+    emb_paths = []
+    for emb_name in args.embedding:
+        emb_path = get_emb_path(emb_name)
+        emb_paths.append(emb_path)
     if args.machine == 'dt':
         data_dir = cache = './data'
         if args.mode == 'run':
@@ -83,7 +87,7 @@ def analyze_args(args):
 
     train_csv = os.path.join(data_dir, 'train.csv')
     test_csv = os.path.join(data_dir, 'test.csv')
-    emb_path = os.path.join(data_dir, 'embeddings', emb_path)
+    emb_paths = [os.path.join(data_dir, 'embeddings', emb_path) for emb_path in emb_paths]
 
     if args.mode == 'test':
         # create smaller files for testing main function
@@ -105,10 +109,10 @@ def analyze_args(args):
         args.split_ratio = sr[0]
     if len(sr) == 3:
         args.test = True
-    return train_csv, test_csv, emb_path, cache
+    return train_csv, test_csv, emb_paths, cache
 
 
-def job(args, train_csv, test_csv, embedding, cache):
+def job(args, train_csv, test_csv, embeddings, cache):
     """ Main function. Reads data, makes preprocessing, trains model and records results.
         Gets args as argument and passes values of it's fields to functions."""
 
@@ -116,7 +120,7 @@ def job(args, train_csv, test_csv, embedding, cache):
 
     # read and preprocess data
     to_cache = not args.no_cache
-    data.read_embedding(embedding, args.unk_std, args.max_vectors, to_cache)
+    data.read_embedding(embeddings, args.unk_std, args.max_vectors, to_cache)
     data.preprocess(args.tokenizer, args.var_length)
     data.embedding_lookup()
 
@@ -168,8 +172,8 @@ def job(args, train_csv, test_csv, embedding, cache):
 
 def main(main_args=None):
     args = parse_main_args(main_args)
-    train_csv, test_csv, emb_path, cache = analyze_args(args)
-    record_path = job(args, train_csv, test_csv, emb_path, cache)
+    train_csv, test_csv, emb_paths, cache = analyze_args(args)
+    record_path = job(args, train_csv, test_csv, emb_paths, cache)
     #path1 = os.path.join(record_path, 'val_probs_3')
     #path2 = os.path.join(record_path, 'val_probs_4')
     #val_paths = [path1, path2]

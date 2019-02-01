@@ -51,7 +51,7 @@ class Learner:
         eval_every = int(len(list(iter(self.train_dl))) / n_eval)
 
         time_start = time.time()
-        # self.scheduler.step()
+        print(self.model)
         for e in range(epoch):
             self.scheduler.step()
             if e >= warmup_epoch:
@@ -138,7 +138,8 @@ class Learner:
     def evaluate(self, dl, tresh):
         with torch.no_grad():
             dl.init_epoch()
-            self.model.cell.flatten_parameters()
+            if hasattr(self.model, 'cell'):
+                self.model.cell.flatten_parameters()
             self.model.eval()
             self.model.zero_grad()
             loss = []
@@ -174,7 +175,8 @@ class Learner:
             print('predicting validation dataset...')
             dl = self.val_dl
 
-        self.model.cell.flatten_parameters()
+        if hasattr(self.model, 'cell'):
+            self.model.cell.flatten_parameters()
         self.model.eval()
         y_pred = []
         y_true = []

@@ -25,6 +25,7 @@ class Data:
         self.train = None
         self.test = None
         self.target = None
+        self.vectors = []
 
     def choose_tokenizer(self, tokenizer):
         if tokenizer == 'whitespace':
@@ -68,10 +69,11 @@ class Data:
         self.qid.build_vocab(self.train, self.test)
         print_duration(time_start, 'time to read and tokenize data: ')
 
-    def read_embedding(self, embedding, unk_std, max_vectors, to_cache):
+    def read_embedding(self, embeddings, unk_std, max_vectors, to_cache):
         time_start = time.time()
         unk_init = partial(normal_init, std=unk_std)
-        self.vectors = MyVectors(embedding, cache=self.cache, to_cache=to_cache, unk_init=unk_init, max_vectors=max_vectors)
+        for emb in embeddings:
+            self.vectors.append(MyVectors(emb, cache=self.cache, to_cache=to_cache, unk_init=unk_init, max_vectors=max_vectors))
         print_duration(time_start, 'time to read embedding: ')
 
     def embedding_lookup(self):
