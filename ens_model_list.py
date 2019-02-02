@@ -18,5 +18,6 @@ model_dict = {
     'gnews_ph_num_cv': ('Jan_19_2019__18_56_02', '-em gnews -e 10 -hd 150 -ne 3 -t gnews_ph_num -k 5 -us 0.1'),  #1195
     'gnews_cv_2': ('Jan_20_2019__08_17_29', '-em gnews -e 12 -hd 150 -ne 3 -k 5 -us 0.1 -lr 0.002'),  #1234
     'wnews_cv_2': ('Jan_21_2019__00_07_54', '-em wnews -e 12 -hd 150 -ne 3 -k 5 -us 0.1 -lr 0.002'), #1288
-    'wnews_cv_3': ('Jan_21_2019__22_08_57', '-em wnews -e 12 -hd 150 -ne 3 -k 5 -us 0.1 -lr 0.0025 -we 10') #1334 ! try --lrstep 2
+    'wnews_cv_3': ('Jan_21_2019__22_08_57', '-em wnews -e 12 -hd 150 -ne 3 -k 5 -us 0.1 -lr 0.0025 -we 10'), #1334 ! try --lrstep 2
+    'linpool_cv': ('Feb_01_2019__16_06_28', '-k 5 -m LinPool4 -em glove paragram wnews gnews -we 20 -e 10') #1501
 }
