@@ -65,9 +65,10 @@ class Data:
         self.test = MyTabularDataset(path=self.test_csv, format='csv',
                                 fields={'qid': ('qid', self.qid),
                                         'question_text': ('text', self.text)})
+        print_duration(time_start, 'time to read and tokenize data: ')
         self.text.build_vocab(self.train, self.test, min_freq=1)
         self.qid.build_vocab(self.train, self.test)
-        print_duration(time_start, 'time to read and tokenize data: ')
+        print_duration(time_start, 'time to read, tokenize and build vocab: ')
 
     def read_embedding(self, embeddings, unk_std, max_vectors, to_cache):
         time_start = time.time()
