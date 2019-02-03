@@ -1,10 +1,10 @@
 # functions for choosing tokenizer, optimizer and model
-import models
+from models import *
 import torch.optim as optim
 
 
 def choose_model(model_name, text, n_layers, hidden_dim, dropout):
-    model = getattr(models, model_name)(text.vocab.vectors,
+    model = globals()[model_name](text.vocab.vectors,
                        lstm_layer=n_layers,
                        padding_idx=text.vocab.stoi[text.pad_token],
                        hidden_dim=hidden_dim,
