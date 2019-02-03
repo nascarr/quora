@@ -1,14 +1,7 @@
 #!/usr/bin/env python
+import torch.optim as optim
 import numpy as np
-import os
-import pandas as pd
-import torch
-import time
-import random
-import pickle
-import os
-from functools import partial
-import torchtext.data as data
+from sklearn.linear_model import LinearRegression
 import subprocess
 import pandas as pd
 import numpy as np
@@ -17,14 +10,22 @@ from datetime import timedelta
 import matplotlib.pyplot as plt
 import glob
 import shutil
-import torch.optim as optim
-import re
-import spacy
 import torch
 import torch.nn as nn
+import torch
+import time
+import random
+import pickle
+import os
+from functools import partial
+import torchtext.data as data
+from gensim.models import KeyedVectors
 from torchtext.data.dataset import *
 from torchtext.vocab import *
 import numpy as np
+import itertools
+import time
+import pickle
             # Explicitly splitting on " " is important, so we don't
 import numpy as np
 import torch
@@ -32,9 +33,7 @@ import torch.nn as nn
 import os
 from sklearn.metrics import f1_score
 import warnings
-import shutil
 import time
-import subprocess
 import sys
 import argparse
 import os
@@ -46,8 +45,48 @@ import argparse
 import pandas as pd
 import os
 import csv
+import numpy as np
 from sklearn.metrics import f1_score
-from gensim.models import KeyedVectors
+# functions for choosing tokenizer, optimizer and model
+
+
+def choose_model(model_name, text, n_layers, hidden_dim, dropout):
+    model = globals()[model_name](text.vocab.vectors,
+                       lstm_layer=n_layers,
+                       padding_idx=text.vocab.stoi[text.pad_token],
+                       hidden_dim=hidden_dim,
+                       dropout=dropout).cuda()
+    return model
+
+
+def choose_optimizer(params, args):
+    if args.optim == 'Adam':
+        optimizer = optim.Adam(params, lr=args.lr)
+    elif args.optim == 'AdamW':
+        optimizer = optim.Adam(params, lr=args.lr, betas=(0.9, 0.99))
+    return optimizer
+
+def ens_mean(preds, y_true, args):
+    return np.mean(np.array(preds), 0)
+
+
+def ens_weight(y_preds, y_true, args):
+    weights = args.weights
+    y_preds = np.transpose(np.array(y_preds))
+    if not weights:
+        X = y_preds
+        y = np.transpose(y_true)
+        reg = LinearRegression(fit_intercept=False).fit(X, y)
+        print('lin reg score: ', reg.score(X, y))
+        weights = reg.coef_
+        print('weights: ', weights)
+    weights = np.array(weights)
+    final_pred = np.transpose(y_preds.dot(weights))
+    return final_pred
+
+
+methods = {'mean': ens_mean,
+           'weight': ens_weight}
 # list of possible models for ensemble
 
 
@@ -56,185 +95,22 @@ model_dict = {
     'glove': ('Jan_10_2019__22:10:15', '-es 2 -e 9 -hd 150'), # 829
     'paragram': ('Jan_11_2019__11:10:57', '-hd 150 -es 2 -e 10 -em paragram -t lowerspacy -us 0'), #873
     'gnews': ('Jan_11_2019__20:21:01', '-em gnews -es 2 -e 10 -hd 150 -us 0.1'), # 889
+    'gnews_num': ('Jan_12_2019__22:13:37', '-em gnews -t gnews_num -es 2 -e 10 -us 0.1 -hd 150'), # 927
     'wnews_test': ('Jan_10_2019__19:33:05_test', '--mode test -em wnews'),
     'glove_test': ('Jan_10_2019__19:34:39_test', '--mode test -em glove'),
+    'glove_cv': ('Jan_17_2019__17_59_36', '-hd 150 -k 5 -ne 3'),  # 1077
+    'paragram_cv': ('Jan_15_2019__04_23_16', '-k 5 -hd 150 -e 10 -em paragram -t lowerspacy -us 0.1'), #983 ! try -ne 3
+    'wnews_cv': ('Jan_11_2019__05:09:58', '-es 3 -e 10 -em wnews -m BiLSTMPoolTest -vl -hd 150 -we 10 --lrstep 20 -k 5 -us 0.1'), #855
+    'gnews_cv': ('Jan_18_2019__15_06_29', '-em gnews -es 2 -e 10 -hd 150 -us 0.1 -k 5 -ne 3'),  # 1113
+    'gnews_num_cv': ('Jan_18_2019__16_45_38', '-em gnews -e 10 -hd 150 -us 0.1 -k 5 -ne 3 -t gnews_num'), # 1119
+    'gnews_ph_cv': ('Jan_19_2019__16_05_11', '-em gnews -e 10 -hd 150 -ne 3 -t gnews_ph -k 5 -us 0.1'), #1189
+    'gnews_ph_num_cv': ('Jan_19_2019__18_56_02', '-em gnews -e 10 -hd 150 -ne 3 -t gnews_ph_num -k 5 -us 0.1'),  #1195
+    'gnews_cv_2': ('Jan_20_2019__08_17_29', '-em gnews -e 12 -hd 150 -ne 3 -k 5 -us 0.1 -lr 0.002'),  #1234
+    'wnews_cv_2': ('Jan_21_2019__00_07_54', '-em wnews -e 12 -hd 150 -ne 3 -k 5 -us 0.1 -lr 0.002'), #1288
+    'wnews_cv_3': ('Jan_21_2019__22_08_57', '-em wnews -e 12 -hd 150 -ne 3 -k 5 -us 0.1 -lr 0.0025 -we 10'), #1334 ! try --lrstep 2
+    'linpool4_cv': ('Feb_01_2019__16_06_28', '-k 5 -m LinPool4 -em glove paragram wnews gnews -we 20 -e 10'), #1501
+    'linpool3_cv': ('Feb_03_2019__14_41_27', '-k 5 -m LinPool3 -em glove paragram wnews -e 10 -lr 0.002 -we 20') #1589
 }
-
-
-def ens_mean(preds, args):
-    return np.mean(np.array(preds), 0)
-
-
-def ens_weight(preds, args):
-    weights = args.weights
-    preds = np.array(preds)
-    if weights:
-        weights = np.array(weights)
-        preds = np.transpose(preds)
-        final_pred = np.transpose(preds.dot(weights))
-        return final_pred
-    else:
-        pass
-    return np.mean(np.array(preds), 0)
-
-
-methods = {'mean': ens_mean,
-           'weight': ens_weight}
-
-def read_datasets_to_df(datasets):
-    dfs = []
-    for d in datasets:
-        dfs.append(pd.read_csv(d))
-    return dfs
-
-
-def dfs_to_csv(dfs, csv_names):
-    if len(dfs) != len(csv_names):
-        raise Exception('len(dfs) != len(csv_names)')
-
-    for df, name in zip(dfs, csv_names):
-        df.to_csv(name)
-    return csv_names
-
-
-def small_ds_paths(paths, new_dir, n, string):
-        """
-        :param paths:
-        :param new_dir:
-        :param n:
-        :param string:
-        :return: Paths for small datasets
-        """
-        small_paths = []
-
-        for p in paths:
-            new_path = change_dir_in_path(p, new_dir)
-            root, ext = os.path.splitext(new_path)
-            small_path = f'{root}_{string}{n}{ext}'
-            small_paths.append(small_path)
-        return small_paths
-
-
-def change_dir_in_path(path, new_dir):
-    _, file_name = os.path.split(path)
-    new_path = os.path.join(new_dir, file_name)
-    return new_path
-
-
-
-def reduce_datasets(csv_names, new_dir, n, rand=False, seed=None):
-    dfs = read_datasets_to_df(csv_names)
-    exists = True
-    if rand:
-        seed = 42 if None else seed
-        small_paths = small_ds_paths(csv_names, new_dir, n, 'rand')
-        for sp in small_paths:
-            if not os.path.exists(sp):
-                exists = False
-        if not exists:
-            small_dfs = [df.sample(n) for df in dfs]
-            dfs_to_csv(small_dfs, small_paths)
-
-    else:
-        small_paths = small_ds_paths(csv_names, new_dir, n, 'head')
-        for sp in small_paths:
-            if not os.path.exists(sp):
-                exists = False
-        if not exists:
-            small_dfs = [df.head(n) for df in dfs]
-            dfs_to_csv(small_dfs, small_paths)
-    return small_paths
-
-
-def reduce_embedding(emb_path, new_dir, n):
-    small_emb_path = small_ds_paths([emb_path], new_dir, n, 'head')[0]
-    if not os.path.exists(small_emb_path):
-        with open(emb_path, 'r') as f:
-            head = [next(f) for i in range(n)]
-        with open(small_emb_path, 'w') as f:
-            f.write(''.join(head))
-    return small_emb_path
-
-
-
-
-def normal_init(tensor, std):
-    return torch.randn_like(tensor) * std
-
-
-class Data:
-    def __init__(self, train_csv, test_csv, cache):
-        self.test_csv = test_csv
-        self.train_csv = train_csv
-        self.cache = cache
-        self.text = None
-        self.qid = None
-        self.train = None
-        self.test = None
-        self.target = None
-
-    def preprocess(self, tokenizer_name, var_length=False):
-        # types of csv columns
-        time_start = time.time()
-        tokenizer = choose_tokenizer(tokenizer_name)
-        self.text = data.Field(batch_first=True, tokenize=tokenizer, include_lengths=var_length)
-        self.qid = data.Field()
-        self.target = data.Field(sequential=False, use_vocab=False, is_target=True)
-
-        # read and tokenize data
-        print('read and tokenize data...')
-        self.train = MyTabularDataset(path=self.train_csv, format='csv',
-                                 fields={'qid': ('qid', self.qid),
-                                         'question_text': ('text', self.text),
-                                         'target': ('target', self.target)})
-
-        self.test = MyTabularDataset(path=self.test_csv, format='csv',
-                                fields={'qid': ('qid', self.qid),
-                                        'question_text': ('text', self.text)})
-        self.text.build_vocab(self.train, self.test, min_freq=1)
-        self.qid.build_vocab(self.train, self.test)
-        print_duration(time_start, 'time to read and tokenize data: ')
-
-
-    def embedding_lookup(self, embedding, unk_std, max_vectors, to_cache):
-        print('embedding lookup...')
-        time_start = time.time()
-        unk_init = partial(normal_init, std=unk_std)
-        self.text.vocab.load_vectors(MyVectors(embedding, cache=self.cache, to_cache=to_cache, unk_init=unk_init, max_vectors=max_vectors))
-        print_duration(time_start, 'time for embedding lookup: ')
-        return
-
-    def split(self, kfold, split_ratio, is_test, seed):
-        random.seed(seed)
-        if kfold:
-            data_iter = self.train.split_kfold(kfold, is_test=is_test, random_state=random.getstate())
-        else:
-            data_iter = self.train.split(split_ratio, random_state=random.getstate())
-        return data_iter
-
-
-def iterate(train, val, test, batch_size):
-    train_iter = data.BucketIterator(dataset=train,
-                                     batch_size=batch_size,
-                                     sort_key=lambda x: x.text.__len__(),
-                                     shuffle=True,
-                                     sort=False,
-                                     sort_within_batch=True)
-
-    val_iter = data.BucketIterator(dataset=val,
-                                   batch_size=batch_size,
-                                   sort_key=lambda x: x.text.__len__(),
-                                   train=False,
-                                   sort=False,
-                                   sort_within_batch=True)
-
-    test_iter = data.BucketIterator(dataset=test,
-                                    batch_size=batch_size,
-                                    sort_key=lambda x: x.text.__len__(),
-                                    sort=False,
-                                    train=False,
-                                    sort_within_batch=True)
-    return train_iter, val_iter, test_iter
 
 
 def _submit(test_ids, predictoins, subm_name):
@@ -246,7 +122,7 @@ def _submit(test_ids, predictoins, subm_name):
 
 def submit(test_ids, labels, probs, subm_name='submission.csv'):
     _submit(test_ids, labels, subm_name)
-    _submit(test_ids, probs, 'test_probs.csv')
+    pred_to_csv(test_ids, probs, labels, 'test_probs.csv')
     print(f'predictions saved in {subm_name}, test_probs.csv file')
 
 
@@ -256,6 +132,7 @@ def f1_metric(tp, n_targs, n_preds):
     else:
         prec = tp/n_preds
         rec = tp/n_targs
+        print('prec: ', prec, 'rec: ', rec)
         f1 = 2 * rec * prec / (rec + prec)
     return f1
 
@@ -333,125 +210,15 @@ def copy_files(arg_list, dest_dir):
     for a in arg_list:
         for file in glob.glob(a):
             shutil.copy(file, dest_dir)
-# functions for choosing tokenizer, optimizer and model
 
 
-def choose_tokenizer(tokenizer):
-    if tokenizer == 'whitespace':
-        return WhitespaceTokenizer()
-    elif tokenizer == 'custom':
-        return CustomTokenizer()
-    elif tokenizer == 'lowerspacy':
-        return LowerSpacy()
-    elif tokenizer == 'gnews_sw':
-        return GNewsTokenizerSW()
-    elif tokenizer == 'gnews_num':
-        return GNewsTokenizerNum()
-    else:
-        return tokenizer
-
-
-def choose_model(model_name, text, n_layers, hidden_dim, dropout):
-    model = BiLSTMPool(text.vocab.vectors,
-                       lstm_layer=n_layers,
-                       padding_idx=text.vocab.stoi[text.pad_token],
-                       hidden_dim=hidden_dim,
-                       dropout=dropout).cuda()
-    return model
-
-
-def choose_optimizer(params, args):
-    if args.optim == 'Adam':
-        optimizer = optim.Adam(params, lr=args.lr)
-    elif args.optim == 'AdamW':
-        optimizer = optim.Adam(params, lr=args.lr, betas=(0.9, 0.99))
-    return optimizer
-
-def lower_spacy(x):
-    spacy_en = spacy.load('en')
-    tokens = [tok.text.lower() for tok in spacy_en.tokenizer(x)]
-    return tokens
-
-
-class LowerSpacy(object):
-    def __init__(self):
-        self.tokenizer = spacy.load('en').tokenizer
-
-    def __call__(self, x):
-        return [tok.text.lower() for tok in self.tokenizer(x)]
-
-
-class WhitespaceTokenizer(object):
-    def __init__(self):
-        pass
-
-    def __call__(self, text):
-        words = text.split(' ')
-        return words
-
-
-class CustomTokenizer(object):
-    def __init__(self):
-        #self.allowed_re = re.compile('^[A-Za-z0-9.,?!()]*$')
-        self.punct = re.compile('[,!.?()]')
-
-    def __call__(self, text):
-        substrings = text.split(' ')
-        tokens = []
-        for ss in substrings:
-            punct_match = self.punct.search(ss)
-            if punct_match:
-                start = punct_match.start()
-                ss_tokens = [ss[:start], ss[start], ss[start + 1:]]
-                ss_tokens = [t for t in ss_tokens if len(t) > 0]
-            else:
-                ss_tokens = [ss]
-            tokens.extend(ss_tokens)
-        return tokens
-
-
-class GNewsTokenizerSW(object):
-    def __init__(self):
-        self.spacy_en = spacy.load('en')
-        self.tokenizer = self.spacy_en.tokenizer
-        self.remove_all_stopwords()
-        self.add_stopwords(GNEWS_STOP_WORDS)
-
-    def __call__(self, x):
-        result = [tok.text for tok in self.tokenizer(x) if not tok.is_stop]
-        if len(result) == 0:
-            return ['<zero_length>']
-        else:
-            return result
-
-    def remove_all_stopwords(self):
-        spacy_stopwords = spacy.lang.en.stop_words.STOP_WORDS
-        for w in spacy_stopwords:
-            lexeme = self.spacy_en.vocab[w]
-            lexeme.is_stop = False
-
-    def add_stopwords(self, custom_stop_words):
-        for w in custom_stop_words:
-            lexeme = self.spacy_en.vocab[w]
-            lexeme.is_stop = True
-
-
-class GNewsTokenizerNum(object):
-    def __init__(self):
-        self.spacy_en = spacy.load('en')
-        self.tokenizer = self.spacy_en.tokenizer
-        self.num_symb_re = re.compile('^[^a-zA-Z]*[0-9]+[^a-zA-Z]*$')
-        self.sub_re = re.compile('[0-9]')
-
-    def tokenize_numbers(self, tok):
-        if self.num_symb_re.match(tok) and len(tok) > 1:
-            tok = self.sub_re.sub('#', tok)
-        return tok
-
-    def __call__(self, x):
-        return [self.tokenize_numbers(tok.text) for tok in self.tokenizer(x)]
-
-
+def pred_to_csv(ids, y_pred, y_true, fpath='val_probs.csv', mode='w'):
+    df = pd.DataFrame()
+    df['qid'] = ids
+    df['prediction'] = y_pred
+    df['true_label'] = y_true
+    header = True if mode == 'w' else False
+    df.to_csv(fpath, index=False, mode=mode, header=header)
 
 def section_sizes_and_lengths(lengths):
     bs = len(lengths)
@@ -811,68 +578,352 @@ class BiLSTMPool_2FC(nn.Module):
         average_pool = torch.mean(lstm_out, 0)
         y = self.fc1(self.dropout(torch.cat((max_pool, average_pool, output), dim=1)))
         y = self.fc2(self.dropout(y))
-        return y# Overriding torchtext methods
+        return y
+
+
+class LinPool(nn.Module):
+    # emb -> lin layer -> max, average pool -> lin layer -> label
+    def __init__(self, pretrained_lm, padding_idx, static=True, hidden_dim=100, lstm_layer=2, dropout=0.2):
+        super(LinPool, self).__init__()
+        self.hidden_dim = hidden_dim
+        self.num_layers = lstm_layer
+        self.dropout = nn.Dropout(p=dropout)
+        self.embedding = nn.Embedding.from_pretrained(pretrained_lm)
+        self.embedding.padding_idx = padding_idx
+        if static:
+            self.embedding.weight.requires_grad = False
+        self.fc1 = nn.Linear(self.embedding.embedding_dim, self.hidden_dim)
+        self.fc2 = nn.Linear(2 * self.hidden_dim + 1, 1)
+
+    def forward(self, sents, lengths=None):
+        x = self.embedding(sents)
+        x1 = self.fc1(x)
+        max_pool, _ = torch.max(x1, 1)
+        average_pool = torch.mean(x1, 1)
+        lengths = lengths.view(-1, 1).float()
+        long_output = torch.cat((max_pool, average_pool, lengths), dim=1)
+        y = self.fc2(self.dropout(long_output))
+        return y
+
+class LinPool4(nn.Module):
+    # 4 embeddings, lin layer for each embedding -> concat all ouptus -> max, average pool -> lin layer -> label
+    def __init__(self, pretrained_lm, padding_idx, static=True, hidden_dim=100, lstm_layer=2, dropout=0.2):
+        super(LinPool4, self).__init__()
+        self.hidden_dim = hidden_dim
+        self.num_layers = lstm_layer
+        self.dropout = nn.Dropout(p=dropout)
+        self.embedding = nn.Embedding.from_pretrained(pretrained_lm)
+        self.embedding.padding_idx = padding_idx
+        if static:
+            self.embedding.weight.requires_grad = False
+        self.fc1 = nn.Linear(300, self.hidden_dim)
+        self.fc2 = nn.Linear(300, self.hidden_dim)
+        self.fc3 = nn.Linear(300, self.hidden_dim)
+        self.fc4 = nn.Linear(300, self.hidden_dim)
+        self.fc5 = nn.Linear(2 * self.hidden_dim * self.embedding.embedding_dim//300, 1)
+
+    def forward(self, sents, lengths=None):
+        x0 = self.embedding(sents)
+        x1 = self.fc1(x0[:,:,:300])
+        x2 = self.fc2(x0[:,:,300:600])
+        x3 = self.fc3(x0[:,:,600:900])
+        x4 = self.fc4(x0[:,:,900:1200])
+        x_cat = torch.cat((x1, x2, x3, x4), dim=2)
+        max_pool, _ = torch.max(x_cat, 1)
+        average_pool = torch.mean(x_cat, 1)
+        long_output = torch.cat((max_pool, average_pool), dim=1)
+        y = self.fc5(self.dropout(long_output))
+        return y
+
+
+class LinPool3(nn.Module):
+    # 4 embeddings, lin layer for each embedding -> concat all ouptus -> max, average pool -> lin layer -> label
+    def __init__(self, pretrained_lm, padding_idx, static=True, hidden_dim=100, lstm_layer=2, dropout=0.2):
+        super(LinPool3, self).__init__()
+        self.hidden_dim = hidden_dim
+        self.num_layers = lstm_layer
+        self.dropout = nn.Dropout(p=dropout)
+        self.embedding = nn.Embedding.from_pretrained(pretrained_lm)
+        self.embedding.padding_idx = padding_idx
+        if static:
+            self.embedding.weight.requires_grad = False
+        self.fc1 = nn.Linear(300, self.hidden_dim)
+        self.fc2 = nn.Linear(300, self.hidden_dim)
+        self.fc3 = nn.Linear(300, self.hidden_dim)
+        self.fc4 = nn.Linear(2 * self.hidden_dim * self.embedding.embedding_dim//300, 1)
+
+    def forward(self, sents, lengths=None):
+        x0 = self.embedding(sents)
+        x1 = self.fc1(x0[:,:,:300])
+        x2 = self.fc2(x0[:,:,300:600])
+        x3 = self.fc3(x0[:,:,600:900])
+        x_cat = torch.cat((x1, x2, x3), dim=2)
+        max_pool, _ = torch.max(x_cat, 1)
+        average_pool = torch.mean(x_cat, 1)
+        long_output = torch.cat((max_pool, average_pool), dim=1)
+        y = self.fc4(self.dropout(long_output))
+        return y
+
+
+def normal_init(tensor, std):
+    return torch.randn_like(tensor) * std
+
+
+class Data:
+    def __init__(self, train_csv, test_csv, cache):
+        self.test_csv = test_csv
+        self.train_csv = train_csv
+        self.cache = cache
+        self.text = None
+        self.qid = None
+        self.train = None
+        self.test = None
+        self.target = None
+        self.vectors = []
+
+    def choose_tokenizer(self, tokenizer):
+        if tokenizer == 'whitespace':
+            return WhitespaceTokenizer()
+        elif tokenizer == 'custom':
+            return CustomTokenizer()
+        elif tokenizer == 'lowerspacy':
+            return LowerSpacy()
+        elif tokenizer == 'gnews_sw':
+            return GNewsTokenizerSW()
+        elif tokenizer == 'gnews_num':
+            return GNewsTokenizerNum()
+        elif tokenizer == 'gnews_ph':
+            emb_set = set(self.vectors.itos)
+            return GNewsTokenizerPhrase(emb_set)
+        elif tokenizer == 'gnews_ph_num':
+            emb_set = set(self.vectors.itos)
+            return GNewsTokenizerPhraseNum(emb_set)
+        else:
+            return tokenizer
+
+    def preprocess(self, tokenizer_name, var_length=False):
+        # types of csv columns
+        time_start = time.time()
+        tokenizer = self.choose_tokenizer(tokenizer_name)
+        self.text = data.Field(batch_first=True, tokenize=tokenizer, include_lengths=var_length)
+        self.qid = data.Field()
+        self.target = data.Field(sequential=False, use_vocab=False, is_target=True)
+
+        # read and tokenize data
+        print('read and tokenize data...')
+        self.train = MyTabularDataset(path=self.train_csv, format='csv',
+                                 fields={'qid': ('qid', self.qid),
+                                         'question_text': ('text', self.text),
+                                         'target': ('target', self.target)})
+
+        self.test = MyTabularDataset(path=self.test_csv, format='csv',
+                                fields={'qid': ('qid', self.qid),
+                                        'question_text': ('text', self.text)})
+        print_duration(time_start, 'time to read and tokenize data: ')
+        self.text.build_vocab(self.train, self.test, min_freq=1)
+        self.qid.build_vocab(self.train, self.test)
+        print_duration(time_start, 'time to read, tokenize and build vocab: ')
+
+    def read_embedding(self, embeddings, unk_std, max_vectors, to_cache):
+        time_start = time.time()
+        unk_init = partial(normal_init, std=unk_std)
+        for emb in embeddings:
+            self.vectors.append(MyVectors(emb, cache=self.cache, to_cache=to_cache, unk_init=unk_init, max_vectors=max_vectors))
+        print_duration(time_start, 'time to read embedding: ')
+
+    def embedding_lookup(self):
+        print('embedding lookup...')
+        time_start = time.time()
+        self.text.vocab.load_vectors(self.vectors)
+        print_duration(time_start, 'time for embedding lookup: ')
+        return
+
+    def split(self, kfold, split_ratio, stratified, is_test, seed):
+        random.seed(seed)
+        if kfold:
+            data_iter = self.train.split_kfold(kfold, is_test=is_test, stratified=stratified, strata_field='target', random_state=random.getstate())
+        else:
+            data_iter = self.train.split(split_ratio, stratified=stratified, strata_field='target', random_state=random.getstate())
+        return data_iter
+
+
+def iterate(train, val, test, batch_size):
+    train_iter = data.BucketIterator(dataset=train,
+                                     batch_size=batch_size,
+                                     sort_key=lambda x: x.text.__len__(),
+                                     shuffle=True,
+                                     sort=False,
+                                     sort_within_batch=True)
+
+    val_iter = data.BucketIterator(dataset=val,
+                                   batch_size=batch_size,
+                                   sort_key=lambda x: x.text.__len__(),
+                                   train=False,
+                                   sort=False,
+                                   sort_within_batch=True)
+
+    test_iter = data.BucketIterator(dataset=test,
+                                    batch_size=batch_size,
+                                    sort_key=lambda x: x.text.__len__(),
+                                    sort=False,
+                                    train=False,
+                                    sort_within_batch=True)
+    return train_iter, val_iter, test_iter
+
+
+# Overriding torchtext methods
 
 
 class MyTabularDataset(TabularDataset):
     """Subclass of torch.data.dataset.TabularDataset for k-fold cross-validation"""
+    def __init__(self, path, format, fields, skip_header=False,
+                 csv_reader_params={}, **kwargs):
+        """Create a TabularDataset given a path, file format, and field list.
 
-    def split(self, split_ratio=0.8, stratified=False, strata_field='label',
+        Arguments:
+            path (str): Path to the data file.
+            format (str): The format of the data file. One of "CSV", "TSV", or
+                "JSON" (case-insensitive).
+            fields (list(tuple(str, Field)) or dict[str: tuple(str, Field)]:
+                If using a list, the format must be CSV or TSV, and the values of the list
+                should be tuples of (name, field).
+                The fields should be in the same order as the columns in the CSV or TSV
+                file, while tuples of (name, None) represent columns that will be ignored.
+
+                If using a dict, the keys should be a subset of the JSON keys or CSV/TSV
+                columns, and the values should be tuples of (name, field).
+                Keys not present in the input dictionary are ignored.
+                This allows the user to rename columns from their JSON/CSV/TSV key names
+                and also enables selecting a subset of columns to load.
+            skip_header (bool): Whether to skip the first line of the input file.
+            csv_reader_params(dict): Parameters to pass to the csv reader.
+                Only relevant when format is csv or tsv.
+                See
+                https://docs.python.org/3/library/csv.html#csv.reader
+                for more details.
+        """
+
+        cache_path = os.path.join('.', (os.path.basename(path) + '.td'))
+        try:
+            with open(cache_path, 'rb') as f:
+                examples = pickle.load(f)
+        except:
+            format = format.lower()
+            make_example = {
+                'json': Example.fromJSON, 'dict': Example.fromdict,
+                'tsv': Example.fromCSV, 'csv': Example.fromCSV}[format]
+
+            with io.open(os.path.expanduser(path), encoding="utf8") as f:
+                if format == 'csv':
+                    reader = unicode_csv_reader(f, **csv_reader_params)
+                elif format == 'tsv':
+                    reader = unicode_csv_reader(f, delimiter='\t', **csv_reader_params)
+                else:
+                    reader = f
+
+                if format in ['csv', 'tsv'] and isinstance(fields, dict):
+                    if skip_header:
+                        raise ValueError('When using a dict to specify fields with a {} file,'
+                                         'skip_header must be False and'
+                                         'the file must have a header.'.format(format))
+                    header = next(reader)
+                    field_to_index = {f: header.index(f) for f in fields.keys()}
+                    make_example = partial(make_example, field_to_index=field_to_index)
+
+                if skip_header:
+                    next(reader)
+
+                examples = [make_example(line, fields) for line in reader]
+                with open(cache_path, 'wb') as f:
+                    pickle.dump(examples, f)
+
+        if isinstance(fields, dict):
+            fields, field_dict = [], fields
+            for field in field_dict.values():
+                if isinstance(field, list):
+                    fields.extend(field)
+                else:
+                    fields.append(field)
+
+        super(TabularDataset, self).__init__(examples, fields, **kwargs)
+
+    def split(self, split_ratio=0.8, stratified=False, strata_field='target',
               random_state=None):
-        splits = super().split(split_ratio, stratified, strata_field, random_state)
+        splits = super().split(split_ratio, stratified=stratified, strata_field=strata_field, random_state=random_state)
         return [splits]
 
-    def split_kfold(self, k, stratified=False, is_test=False, random_state=None):
-        def _iter_folds():
-            i = 0
-            while i < k:
-                # val index
-                val_start_idx = cut_idxs[i]
-                val_end_idx = cut_idxs[i + 1]
-                val_index = randperm[val_start_idx:val_end_idx]
-
-                # test index
-                if is_test:
-                    if i <= k - 2:
-                        test_start_idx = cut_idxs[i + 1]
-                        test_end_idx = cut_idxs[i + 2]
-                    else:
-                        test_start_idx = cut_idxs[0]
-                        test_end_idx = cut_idxs[1]
-                    test_index = randperm[test_start_idx:test_end_idx]
-                else:
-                    test_index = []
-
-                # train index
-                train_index = list(set(randperm) - set(test_index) - set(val_index))
-
-                # split examples by index and create datasets
-                train_data, val_data, test_data = tuple([self.examples[idx] for idx in index]
-                                                        for index in [train_index, val_index, test_index])
-                splits = tuple(Dataset(d, self.fields)
-                               for d in (train_data, val_data, test_data) if d)
-
-                # In case the parent sort key isn't none
-                if self.sort_key:
-                    for subset in splits:
-                        subset.sort_key = self.sort_key
-                i += 1
+    def split_kfold(self, k, stratified=False, strata_field='target', is_test=False, random_state=None):
+        rnd = RandomShuffler(random_state)
+        if stratified:
+            strata = stratify(self.examples, strata_field)
+            group_generators = [self.iter_folds(group, k, rnd, is_test) for group in strata]
+            for fold_data in zip(*group_generators):
+                split_data = list(zip(*fold_data))
+                split_data = [[e for g in data for e in g]
+                                                   for data in split_data]
+                splits = self.make_datasets(split_data)
+                yield splits
+        else:
+            for fold_data in self.iter_folds(self.examples, k, rnd, is_test):
+                splits = self.make_datasets(fold_data)
                 yield splits
 
-        rnd = RandomShuffler(random_state)
-        N = len(self.examples)
+    def make_datasets(self, split_data):
+        split_data = [data for data in split_data if len(data) > 0]
+        percents = [sum([int(e.target) for e in data]) / len(data) * 100 for data in split_data]
+        print('percent of toxic questions for train_val_test data: ', percents)
+        splits = tuple(Dataset(d, self.fields) for d in split_data)
+        if self.sort_key:
+            for subset in splits:
+                subset.sort_key = self.sort_key
+        return splits
+
+    def iter_folds(self, examples, k, rnd, is_test):
+        N = len(examples)
         randperm = rnd(range(N))
-        fold_len = int(N/k)
+        fold_len = int(N / k)
         cut_idxs = [e * fold_len for e in list(range(k))] + [N]
-        data_iter = _iter_folds()
-        return data_iter
+        i = 0
+        while i < k:
+            train_index, val_index, test_index = k_split_indices(randperm, cut_idxs, k, i, is_test)
+            train_data, val_data, test_data = tuple([examples[idx] for idx in index]
+                                                    for index in [train_index, val_index, test_index])
+            i += 1
+            yield train_data, val_data, test_data
+
+
+def k_split_indices(randperm, cut_idxs, k, i, is_test):
+    time_start = time.time()
+
+    # val index
+    val_start_idx = cut_idxs[i]
+    val_end_idx = cut_idxs[i + 1]
+    val_index = randperm[val_start_idx:val_end_idx]
+
+    # test index
+    if is_test:
+        if i <= k - 2:
+            test_start_idx = cut_idxs[i + 1]
+            test_end_idx = cut_idxs[i + 2]
+        else:
+            test_start_idx = cut_idxs[0]
+            test_end_idx = cut_idxs[1]
+        test_index = randperm[test_start_idx:test_end_idx]
+    else:
+        test_index = []
+    val_test_index = set(val_index + test_index)
+    # train index
+    print_duration(time_start, message='k_split_indices time')
+    train_index = [idx for idx in randperm if idx not in val_test_index]
+    print_duration(time_start, message='k_split_indices time')
+    return train_index, val_index, test_index
 
 
 class MyVectors(Vectors):
-    #def __init__(self, *args, **kwargs):
+    # def __init__(self, *args, **kwargs):
     #    self.tokens = 0
     #    super(MyVectors, self).__init__(*args, *kwargs)
-    def __init__(self, name, cache=None, to_cache = True,
+    def __init__(self, name, cache=None, to_cache=True,
                  url=None, unk_init=None, max_vectors=None):
         """
         Arguments:
@@ -901,14 +952,13 @@ class MyVectors(Vectors):
         else:
             self.load(name, max_vectors=max_vectors)
 
-
     def __getitem__(self, token):
         if token in self.stoi:
-            #self.tokens += 1
-            #print(self.tokens, self.low_tokens)
+            # self.tokens += 1
+            # print(self.tokens, self.low_tokens)
             return self.vectors[self.stoi[token]]
         elif token.lower() in self.stoi:
-            #self.low_tokens += 1
+            # self.low_tokens += 1
             return self.vectors[self.stoi[token.lower()]]
         else:
             return self.unk_init(torch.Tensor(self.dim))
@@ -1044,11 +1094,12 @@ def emb_from_txt(path, ext, max_vectors):
 
 
 def emb_from_bin(path, max_vectors):
-    emb_index = KeyedVectors.load_word2vec_format(path, limit = max_vectors, binary=True)
+    emb_index = KeyedVectors.load_word2vec_format(path, limit=max_vectors, binary=True)
     itos = emb_index.index2word
     vectors = emb_index.vectors
     dim = emb_index.vector_size
     return itos, vectors, dim
+
 
 def _infer_shape(f):
     num_lines, vector_dim = 0, None
@@ -1065,6 +1116,7 @@ def _infer_shape(f):
             num_lines += 1
     f.seek(0)
     return num_lines, vector_dim
+    pred_to_csv
 
 
 class Learner:
@@ -1108,6 +1160,7 @@ class Learner:
         eval_every = int(len(list(iter(self.train_dl))) / n_eval)
 
         time_start = time.time()
+        print(self.model)
         for e in range(epoch):
             self.scheduler.step()
             if e >= warmup_epoch:
@@ -1146,13 +1199,15 @@ class Learner:
                 self.optimizer.step()
 
                 if step % eval_every == 0:
+                    # self.scheduler.step()
                     with torch.no_grad():
                         # train evaluation
                         losses.append(loss.cpu().data.numpy())
                         train_loss = np.mean(losses)
 
                         # val evaluation
-                        val_loss, val_f1 = self.evaluate(self.val_dl, tresh)
+                        val_loss, val_f1, val_ids, val_prob, val_true = self.evaluate(self.val_dl, tresh)
+                        pred_to_csv(val_ids, val_prob, val_true, f'val_probs_{int(step / eval_every) - 1}.csv')
                         self.recorder.val_record.append({'step': step, 'loss': val_loss, 'f1': val_f1})
                         info = {'best_ep': e, 'step': step, 'train_loss': train_loss,
                                 'val_loss': val_loss, 'val_f1': val_f1}
@@ -1184,7 +1239,7 @@ class Learner:
         self.model, info = self.recorder.load(message = 'best model:')
 
         # final train evaluation
-        train_loss, train_f1 = self.evaluate(self.train_dl, tresh)
+        train_loss, train_f1, _, _, _ = self.evaluate(self.train_dl, tresh)
         tr_info = {'train_loss':train_loss, 'train_f1':train_f1}
         self.recorder.append_info(tr_info, message='train loss and f1:')
 
@@ -1192,26 +1247,34 @@ class Learner:
     def evaluate(self, dl, tresh):
         with torch.no_grad():
             dl.init_epoch()
-            self.model.cell.flatten_parameters()
+            if hasattr(self.model, 'cell'):
+                self.model.cell.flatten_parameters()
             self.model.eval()
             self.model.zero_grad()
             loss = []
             tp = 0
             n_targs = 0
             n_preds = 0
+            probs = []
+            targs = []
+            ids = []
             for batch in iter(dl):
                 model_input = self.to_cuda(batch.text)
                 y = batch.target.type(torch.Tensor).cuda()
                 pred = self.model.forward(*model_input).view(-1)
                 loss.append(self.loss_func(pred, y).cpu().data.numpy())
-                label = (torch.sigmoid(pred).cpu().data.numpy() > tresh).astype(int)
+                prob = torch.sigmoid(pred).cpu().data.numpy()
+                label = (prob > tresh).astype(int)
                 y = y.cpu().data.numpy()
                 tp += sum(y + label == 2)
                 n_targs += sum(y)
                 n_preds += sum(label)
+                probs += prob.tolist()
+                targs += y.tolist()
+                ids += batch.qid.view(-1).data.numpy().tolist()
             f1 = f1_metric(tp, n_targs, n_preds)
             loss = np.mean(loss)
-        return loss, f1
+        return loss, f1, ids, probs, targs
 
     def predict_probs(self, is_test=False):
         if is_test:
@@ -1221,7 +1284,8 @@ class Learner:
             print('predicting validation dataset...')
             dl = self.val_dl
 
-        self.model.cell.flatten_parameters()
+        if hasattr(self.model, 'cell'):
+            self.model.cell.flatten_parameters()
         self.model.eval()
         y_pred = []
         y_true = []
@@ -1334,7 +1398,7 @@ class Recorder:
 
         # copy all records to subdir
         png_files = ['val_loss.png', 'val_f1.png'] if not self.args.test else ['loss.png', 'f1.png']
-        csv_files = ['val_probs.csv', 'train_steps.csv', 'submission.csv', 'test_probs.csv']
+        csv_files = ['val_probs*.csv', 'train_steps.csv', 'submission.csv', 'test_probs.csv']
         copy_files([*png_files, 'models/*.info', *csv_files], subdir)
         return subdir
 
@@ -1361,7 +1425,10 @@ def choose_thresh(probs, true, thresh_range, message=True):
     if message:
         print('best threshold is {:.4f} with F1 score: {:.4f}'.format(th, tmp[2]))
 
-    return th, tmp[2]#!/usr/bin/env python
+    return th, tmp[2]
+
+
+#!/usr/bin/env python
 
 
 
@@ -1379,12 +1446,13 @@ def parse_main_args(main_args=None):
     arg('--split_ratio', '-sr', nargs='+', default=[0.8], type=float)
     arg('--test', action='store_true') # if present split data in train-val-test else split train-val
     arg('--seed', default=2018, type=int)
-    arg('--tokenizer', '-t', default='spacy', choices=['spacy', 'whitespace', 'custom', 'lowerspacy', 'gnews_sw', 'gnews_num'])
-    arg('--embedding', '-em', default='glove', choices=['glove', 'gnews', 'paragram', 'wnews'])
+    arg('--tokenizer', '-t', default='spacy')
+    arg('--embedding', '-em', default=['glove'], nargs='+', choices=['glove', 'gnews', 'paragram', 'wnews'])
     arg('--max_vectors', '-mv', default=5000000, type=int)
     arg('--no_cache', action='store_true')
     arg('--var_length', '-vl', action = 'store_false') # variable sequence length in batches
     arg('--unk_std', '-us', default = 0.001, type=float)
+    arg('--stratified', '-s', action='store_true')
 
     # training params
     arg('--optim', '-o', default='Adam', choices=['Adam', 'AdamW'])
@@ -1399,9 +1467,7 @@ def parse_main_args(main_args=None):
     arg('--clip', type=float, default=1, help='gradient clipping')
 
     # model params
-    arg('--model', '-m', default='BiLSTMPool', choices=['BiLSTM', 'BiGRU', 'BiLSTMPool', 'BiLSTM_2FC', 'BiGRUPool',
-                                                    'BiGRUPool_2FC', 'BiLSTMPool_2FC', 'BiLSTMPoolFast', 'BiLSTMPoolOld',
-                                                    'BiLSTMPoolTest'])
+    arg('--model', '-m', default='BiLSTMPool')
     arg('--n_layers', '-n', default=2, type=int, help='Number of layers in model')
     arg('--hidden_dim', '-hd', type=int, default=100)
     arg('--dropout', '-d', type=float, default=0.2)
@@ -1412,18 +1478,22 @@ def parse_main_args(main_args=None):
         args = parser.parse_args()
     return args
 
+def get_emb_path(emb_name):
+    if emb_name == 'glove':
+        emb_path = 'glove.840B.300d/glove.840B.300d.txt'
+    elif emb_name == 'paragram':
+        emb_path = 'paragram_300_sl999/paragram_300_sl999.txt'
+    elif emb_name == 'gnews':
+        emb_path = 'GoogleNews-vectors-negative300/GoogleNews-vectors-negative300.bin'
+    elif emb_name == 'wnews':
+        emb_path = 'wiki-news-300d-1M/wiki-news-300d-1M.vec'
+    return emb_path
 
 def analyze_args(args):
-    if args.embedding == 'glove':
-        emb_path = 'glove.840B.300d/glove.840B.300d.txt'
-    elif args.embedding == 'paragram':
-        emb_path = 'paragram_300_sl999/paragram_300_sl999.txt'
-    elif args.embedding == 'gnews':
-        emb_path = 'GoogleNews-vectors-negative300/GoogleNews-vectors-negative300.bin'
-    elif args.embedding == 'wnews':
-        emb_path = 'wiki-news-300d-1M/wiki-news-300d-1M.vec'
-    # TODO: add other embeddings
-
+    emb_paths = []
+    for emb_name in args.embedding:
+        emb_path = get_emb_path(emb_name)
+        emb_paths.append(emb_path)
     if args.machine == 'dt':
         data_dir = cache = './data'
         if args.mode == 'run':
@@ -1436,7 +1506,7 @@ def analyze_args(args):
 
     train_csv = os.path.join(data_dir, 'train.csv')
     test_csv = os.path.join(data_dir, 'test.csv')
-    emb_path = os.path.join(data_dir, 'embeddings', emb_path)
+    emb_paths = [os.path.join(data_dir, 'embeddings', emb_path) for emb_path in emb_paths]
 
     if args.mode == 'test':
         # create smaller files for testing main function
@@ -1458,22 +1528,23 @@ def analyze_args(args):
         args.split_ratio = sr[0]
     if len(sr) == 3:
         args.test = True
-    return train_csv, test_csv, emb_path, cache
+    return train_csv, test_csv, emb_paths, cache
 
 
-def job(args, train_csv, test_csv, embedding, cache):
+def job(args, train_csv, test_csv, embeddings, cache):
     """ Main function. Reads data, makes preprocessing, trains model and records results.
         Gets args as argument and passes values of it's fields to functions."""
 
     data = Data(train_csv, test_csv, cache)
 
     # read and preprocess data
-    data.preprocess(args.tokenizer, args.var_length)
     to_cache = not args.no_cache
-    data.embedding_lookup(embedding, args.unk_std, args.max_vectors, to_cache)
+    data.read_embedding(embeddings, args.unk_std, args.max_vectors, to_cache)
+    data.preprocess(args.tokenizer, args.var_length)
+    data.embedding_lookup()
 
     # split train dataset
-    data_iter = data.split(args.kfold, args.split_ratio, args.test, args.seed)
+    data_iter = data.split(args.kfold, args.split_ratio, args.stratified, args.test, args.seed)
 
     # iterate through folds
     loss_function = nn.BCEWithLogitsLoss()
@@ -1499,7 +1570,7 @@ def job(args, train_csv, test_csv, embedding, cache):
         # save val predictions
         y_pred, y_true, ids = learn.predict_probs()
         val_ids = [data.qid.vocab.itos[i] for i in ids]
-        val_pred_to_csv(val_ids, y_pred, y_true)
+        pred_to_csv(val_ids, y_pred, y_true)
         # choose best threshold for val predictions
         best_th, max_f1 = choose_thresh(y_pred, y_true, [0.1, 0.5, 0.01], message=True)
         learn.recorder.append_info({'best_th': best_th, 'max_f1': max_f1})
@@ -1508,7 +1579,7 @@ def job(args, train_csv, test_csv, embedding, cache):
         # predict test labels
         test_label, test_prob,_, test_ids, tresh = learn.predict_labels(is_test=True, thresh=args.f1_tresh)
         if args.test:
-            test_loss, test_f1 = learn.evaluate(learn.test_dl, args.f1_tresh)
+            test_loss, test_f1, _, _, _ = learn.evaluate(learn.test_dl, args.f1_tresh)
             learn.recorder.append_info({'test_loss': test_loss, 'test_f1': test_f1}, message='Test set results: ')
 
         # save test predictions to submission.csv
@@ -1520,51 +1591,114 @@ def job(args, train_csv, test_csv, embedding, cache):
 
 def main(main_args=None):
     args = parse_main_args(main_args)
-    train_csv, test_csv, emb_path, cache = analyze_args(args)
-    record_path = job(args, train_csv, test_csv, emb_path, cache)
+    train_csv, test_csv, emb_paths, cache = analyze_args(args)
+    record_path = job(args, train_csv, test_csv, emb_paths, cache)
+    #path1 = os.path.join(record_path, 'val_probs_3')
+    #path2 = os.path.join(record_path, 'val_probs_4')
+    #val_paths = [path1, path2]
+    #test_paths = []
+    #ens = Ensemble(val_paths, test_paths)
+    #ens('mean', thresh=[0.1, 0.5, 0.01])
     return record_path
 
 
 
-class Ensemble:
 
+
+class Ensemble:
     ens_record_path = 'notes/ensemble.csv'
 
-    def __init__(self, models, is_kfold=False, model_args='names'):
-        self.val_pred_paths = [get_pred_path(m, 'val_probs.csv', model_args) for m in models]
-        self.test_pred_paths = [get_pred_path(m, 'test_probs.csv', model_args) for m in models]
-        self.pred_dirs = [get_pred_dir(m, model_args) for m in models]
+    def __init__(self, val_pred_paths, model_names, test_pred_paths=None, pred_dirs=None):
+        self.val_pred_paths = val_pred_paths
+        self.test_pred_paths = test_pred_paths
+        self.pred_dirs = [os.path.dirname(p) for p in self.val_pred_paths] if not pred_dirs else pred_dirs
+        self.model_names = model_names
 
-    def __call__(self, args):
-        thresh = args.thresh
-        method = args.method
+    @classmethod
+    def from_names(cls, model_names):
+        model_args = 'names'
+        val_pred_paths = [get_pred_path(m, 'val_probs.csv', model_args=model_args) for m in model_names]
+        test_pred_paths = [get_pred_path(m, 'test_probs.csv', model_args=model_args) for m in model_names]
+        return cls(val_pred_paths, model_names=model_names, test_pred_paths = test_pred_paths)
 
+    @classmethod
+    def from_dirs(cls, model_dirs):
+        model_args = 'dirs'
+        val_pred_paths = [get_pred_path(d, 'val_probs.csv', model_args=model_args) for d in model_dirs]
+        test_pred_paths = [get_pred_path(d, 'test_probs.csv', model_args=model_args) for d in model_dirs]
+        return cls(val_pred_paths, model_dirs,test_pred_paths, model_dirs)
+
+    @classmethod
+    def from_cv(cls, models, k=5, model_args='names'):
+        """ For each single_model_dir looks for k-1 additional model dirs created right after model_dir.
+        Then creates dir f'{single_model_dir}_cv' and creates in this dir 2 csv files val_probs_cv.csv" and test_probs_cv.csv.
+        Writes concatenation of k val_probs.csv and k test_probs.csv into these  2 files."""
+        single_model_dirs = [get_pred_dir(m, model_args) for m in models]
+        head_dir = os.path.dirname(single_model_dirs[0])
+        cv_head_dir = os.path.join(head_dir, 'cv')
+        k_model_dirs = [find_k_dirs(d, k) for d in single_model_dirs]
+        val_cv_paths, test_cv_paths = [], []
+        for dirs in k_model_dirs:
+            cv_dir = f'{os.path.basename(dirs[0])}_cv'
+            cv_dir = os.path.join(cv_head_dir, cv_dir)
+            os.makedirs(cv_dir, exist_ok=True)
+            val_cv_path = os.path.join(cv_dir, 'val_probs_cv.csv')
+            test_cv_path = os.path.join(cv_dir, 'test_probs_cv.csv')
+            val_cv_paths.append(val_cv_path)
+            test_cv_paths.append(test_cv_path)
+            if not os.path.exists(val_cv_path):
+                mode = 'w'
+                for d in dirs:
+                    val_data = load_pred_from_csv(os.path.join(d, 'val_probs.csv'))
+                    pred_to_csv(*val_data, fpath=val_cv_path, mode=mode)
+                    try:
+                        test_data = load_pred_from_csv(os.path.join(d, 'test_probs.csv'))
+                        pred_to_csv(*test_data, fpath=test_cv_path, mode=mode)
+                    except:
+                        'cant load test data'
+                    if mode == 'w':
+                        mode = 'a'
+        return cls(val_cv_paths, models, test_cv_paths, single_model_dirs)
+
+    def __call__(self, method, thresh, method_params=None):
         # find best method parameters based on validation data
         y_preds = []
         last_ids = None
         for pp in self.val_pred_paths:
             ids, y_prob, y_true = load_pred_from_csv(pp)
             y_preds.append(y_prob)
-            if last_ids:
-                if last_ids != ids:
+            if last_ids is None:
+                last_ids = ids
+            else:
+                if not np.array_equal(last_ids, ids):
                     raise Exception('Prediction ids should be the same for ensemble')
-        val_ens_prob = methods[method](y_preds, args) # target probability after ensembling
+
+        val_ens_prob = methods[method](y_preds, y_true, method_params)  # target probability after ensembling
+        os.makedirs('./ensemble', exist_ok=True)
+        try:
+            pred_to_csv(ids, val_ens_prob, y_true, fpath=os.path.join('./ensemble', ' '.join(self.model_names)))
+        except:
+            print('cant save ensemble predictions for validation data')
         thresh, max_f1 = self.evaluate_ensemble(val_ens_prob, y_true, thresh)
         self.record(max_f1, thresh, method)
-
         # predict test labels and save submission
+        try:
+            self.predict_test(method, thresh)
+        except:
+            print("can't predict test data")
+
+    def predict_test(self, method, thresh):
         y_preds = []
         last_ids = None
         for pp in self.test_pred_paths:
-            ids, y_prob = load_pred_from_csv(pp, is_label=False)
+            ids, y_prob, _ = load_pred_from_csv(pp)
             y_preds.append(y_prob)
             if last_ids:
-                if last_ids != ids:
+                if np.array_equal(last_ids, ids):
                     raise Exception('Prediction ids should be the same for ensemble')
         test_ens_prob = methods[method](y_preds, args)  # target probability after ensembling
         test_ens_label = (test_ens_prob > thresh).astype(int)
         submit(ids, test_ens_label, test_ens_prob)
-
 
     @staticmethod
     def evaluate_ensemble(final_pred, true, thresh):
@@ -1588,11 +1722,10 @@ class Ensemble:
                 descr[1].append(row[1])
         return descr
 
-
     def record(self, max_f1, tresh, method):
         ens_info = format_info({'max_f1': max_f1, 'tresh': tresh})
         ens_info = {'method': method, **ens_info}
-        model_infos = [] # partial model descriptions
+        model_infos = []  # partial model descriptions
         # copy partial models descriptions
         info_paths = [os.path.join(pp, 'info.csv') for pp in self.pred_dirs]
         for ip in info_paths:
@@ -1606,36 +1739,41 @@ class Ensemble:
         dict_to_csv(ens_info, self.ens_record_path, 'a', 'columns', reverse=False, header=True)
 
 
-def val_pred_to_csv(ids, y_pred, y_true, fname='val_probs.csv'):
-    df = pd.DataFrame()
-    df['qid'] = ids
-    df['prediction'] = y_pred
-    df['true_label'] = y_true
-    df.to_csv(fname, index=False)
+def find_k_dirs(model_dir, k):
+    head_dir = os.path.dirname(model_dir)
+    all_entries = [os.path.join(head_dir, d) for d in os.listdir(head_dir)]
+    all_dirs = [d for d in all_entries if os.path.isdir(d)]
+    all_dirs.sort(key=lambda x: os.path.getctime(x))
+    dir_idx = all_dirs.index(model_dir)
+    k_dirs = all_dirs[dir_idx:dir_idx + k]
+    return k_dirs
 
 
 def get_pred_path(m, pred_file_name, model_args='names'):
-    if model_args == 'names':
-        path = os.path.join('./models', model_dict[m][0], pred_file_name)
-    elif model_args == 'paths':
-        path = os.path.join(m, pred_file_name)
+    dir = get_pred_dir(m, model_args)
+    path = os.path.join(dir, pred_file_name)
     return path
 
 
 def get_pred_dir(m, model_args='names'):
     if model_args == 'names':
-        path = os.path.join('./models', model_dict[m][0])
-    elif model_args == 'paths':
-        path = m
-    return path
+        dir = os.path.join('./models', model_dict[m][0])
+    elif model_args == 'dirs':
+        dir = m
+    else:
+        raise Exception('model_args should be names or dirs')
+    return dir
 
 
-def load_pred_from_csv(pred_path, is_label=True):
+def load_pred_from_csv(pred_path):
     df = pd.read_csv(pred_path)
     qid = df['qid']
     probs = df['prediction']
-    true = df['true_label'] if is_label else None
-    column_values = [d.values for d in [qid, probs, true] if d is not None]
+    if len(df.columns) == 3:
+        true = df['true_label']
+    else:
+        true = pd.DataFrame([None] * len(df))
+    column_values = [d.values for d in [qid, probs, true]]
     return column_values
 
 
@@ -1643,9 +1781,10 @@ def ens_parser(add_help=True):
     parser = argparse.ArgumentParser(add_help=add_help)
     arg = parser.add_argument
     arg('--models', '-m', nargs='+', type=str, default=['glove', 'wnews', 'paragram'])
-    arg('-k', action='store_true')
+    arg('--model_args', '-ma', type=str, default='names', choices=['names', 'dirs', 'paths'])
+    arg('-k', default=None, type=int)
     arg('--method', '-mth', default='mean', type=str, choices=['mean', 'weight', 'stack'])
-    arg('--weights', '-w', nargs='+', default=[0.9, 0.1], type=float)
+    arg('--weights', '-w', nargs='+', default=None, type=float)
     arg('--thresh', '-th', nargs='+', default=[0.1, 0.5, 0.01], type=float)
     return parser
 
@@ -1656,14 +1795,11 @@ def parse_ens_args():
     return args
 
 
-#!/usr/bin/env python
-
-
 def parse_ens_main_args():
     parser = argparse.ArgumentParser(parents=[ens_parser(add_help=False)])
     arg = parser.add_argument
-    arg('--main_args', '-a', nargs='+', default=["-es 3 -e 8 -em wnews -hd 150 -we 10 --lrstep 10 -us 0.1", "-e 5 -hd 150 -us 0.1", "-e 5 -hd 150 -em paragram -us 0", "-em gnews -es 2 -e 8 -hd 150 -us 0.1"], type=str)
-    args = parser.parse_args()
+    arg('--main_args', '-a', nargs='+', default=["-es 3 -e 8 -em wnews -hd 150 -we 10 --lrstep 10 -mv 500000", "-e 5 -hd 150 -mv 1100000", "-e 8 -hd 150 -em paragram -us 0 -mv 850000"], type=str)
+    args = parser.parse_args([])
     return args
 
 
@@ -1674,8 +1810,8 @@ if __name__ == '__main__':
     for a in main_args:
         record_dir = main(a)
         record_dirs.append(record_dir)
-    ens = Ensemble(record_dirs, args.k, model_args='paths')
-    ens(args)
+    ens = Ensemble.from_dirs(record_dirs)
+    ens(args.method, args.thresh, args)
 
-# '--mode test -em glove', '--mode test -em wnews', '--mode test -em paragram', '--mode test -em gnews'
-# "-es 3 -e 8 -em wnews -hd 150 -we 10 --lrstep 10 -us 0.1", "-e 5 -hd 150 -us 0.1", "-e 5 -hd 150 -em paragram -us 0", "-em gnews -es 2 -e 8 -hd 150 -us 0.1"
+# '--mode test -em glove', '--mode test -em wnews', '--mode test -em paragram'
+# "-es 3 -e 8 -em wnews -hd 150 -we 10 --lrstep 10 -us 0.1", "-e 5 -hd 150 -us 0.1", "-e 5 -hd 150 -em paragram -us 0"
