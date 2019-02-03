@@ -1,6 +1,6 @@
 import re
 import spacy
-from stop_words import GNEWS_STOP_WORDS
+# from stop_words import GNEWS_STOP_WORDS
 
 
 class Spacy:
