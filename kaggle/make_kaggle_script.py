@@ -5,8 +5,7 @@ import glob
 
 
 main_scripts = ['learner.py', 'main.py', 'ensemble.py', 'ens_main.py']
-exclude_scripts = ['models_dev.py', 'stop_words.py', 'correlation.py', 'read_csv.py', 'analyze.py',
-                   'create_test_datasets.py', 'sort_prediction.py', 'stop_words.py', 'tokenizers.py']
+exclude_scripts = ['models_dev.py', 'stop_words.py', 'correlation.py', 'read_csv.py', 'analyze.py', 'sort_prediction.py', 'stop_words.py', 'tokenizers.py']
 pydir = '.'
 kaggle_script = 'kaggle/kaggle_script.py'
 
