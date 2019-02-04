@@ -1,4 +1,16 @@
 #!/usr/bin/env python
+import os
+import pandas as pd
+import subprocess
+import pandas as pd
+import numpy as np
+import time
+from datetime import timedelta
+import matplotlib.pyplot as plt
+import glob
+import shutil
+import torch
+import torch.nn as nn
 from gensim.models import KeyedVectors
 from torchtext.data.dataset import *
 from torchtext.vocab import *
@@ -8,27 +20,15 @@ import time
 import pickle
             # Explicitly splitting on " " is important, so we don't
 import torch
-import torch.nn as nn
-import subprocess
-import pandas as pd
-import numpy as np
-import time
-from datetime import timedelta
-import matplotlib.pyplot as plt
-import glob
-import shutil
-import numpy as np
-from sklearn.linear_model import LinearRegression
-import torch.optim as optim
-import os
-import pandas as pd
-import torch
 import time
 import random
 import pickle
 import os
 from functools import partial
 import torchtext.data as data
+import numpy as np
+from sklearn.linear_model import LinearRegression
+import torch.optim as optim
 import numpy as np
 import torch
 import torch.nn as nn
@@ -49,352 +49,189 @@ import os
 import csv
 import numpy as np
 from sklearn.metrics import f1_score
-# Overriding torchtext methods
+
+def read_datasets_to_df(datasets):
+    dfs = []
+    for d in datasets:
+        dfs.append(pd.read_csv(d))
+    return dfs
 
 
-class MyTabularDataset(TabularDataset):
-    """Subclass of torch.data.dataset.TabularDataset for k-fold cross-validation"""
-    def __init__(self, path, format, fields, skip_header=False,
-                 csv_reader_params={}, **kwargs):
-        """Create a TabularDataset given a path, file format, and field list.
+def dfs_to_csv(dfs, csv_names):
+    if len(dfs) != len(csv_names):
+        raise Exception('len(dfs) != len(csv_names)')
 
-        Arguments:
-            path (str): Path to the data file.
-            format (str): The format of the data file. One of "CSV", "TSV", or
-                "JSON" (case-insensitive).
-            fields (list(tuple(str, Field)) or dict[str: tuple(str, Field)]:
-                If using a list, the format must be CSV or TSV, and the values of the list
-                should be tuples of (name, field).
-                The fields should be in the same order as the columns in the CSV or TSV
-                file, while tuples of (name, None) represent columns that will be ignored.
+    for df, name in zip(dfs, csv_names):
+        df.to_csv(name)
+    return csv_names
 
-                If using a dict, the keys should be a subset of the JSON keys or CSV/TSV
-                columns, and the values should be tuples of (name, field).
-                Keys not present in the input dictionary are ignored.
-                This allows the user to rename columns from their JSON/CSV/TSV key names
-                and also enables selecting a subset of columns to load.
-            skip_header (bool): Whether to skip the first line of the input file.
-            csv_reader_params(dict): Parameters to pass to the csv reader.
-                Only relevant when format is csv or tsv.
-                See
-                https://docs.python.org/3/library/csv.html#csv.reader
-                for more details.
+
+def small_ds_paths(paths, new_dir, n, string):
         """
-
-        cache_path = os.path.join('.', (os.path.basename(path) + '.td'))
-        try:
-            with open(cache_path, 'rb') as f:
-                examples = pickle.load(f)
-        except:
-            format = format.lower()
-            make_example = {
-                'json': Example.fromJSON, 'dict': Example.fromdict,
-                'tsv': Example.fromCSV, 'csv': Example.fromCSV}[format]
-
-            with io.open(os.path.expanduser(path), encoding="utf8") as f:
-                if format == 'csv':
-                    reader = unicode_csv_reader(f, **csv_reader_params)
-                elif format == 'tsv':
-                    reader = unicode_csv_reader(f, delimiter='\t', **csv_reader_params)
-                else:
-                    reader = f
-
-                if format in ['csv', 'tsv'] and isinstance(fields, dict):
-                    if skip_header:
-                        raise ValueError('When using a dict to specify fields with a {} file,'
-                                         'skip_header must be False and'
-                                         'the file must have a header.'.format(format))
-                    header = next(reader)
-                    field_to_index = {f: header.index(f) for f in fields.keys()}
-                    make_example = partial(make_example, field_to_index=field_to_index)
-
-                if skip_header:
-                    next(reader)
-
-                examples = [make_example(line, fields) for line in reader]
-                with open(cache_path, 'wb') as f:
-                    pickle.dump(examples, f)
-
-        if isinstance(fields, dict):
-            fields, field_dict = [], fields
-            for field in field_dict.values():
-                if isinstance(field, list):
-                    fields.extend(field)
-                else:
-                    fields.append(field)
-
-        super(TabularDataset, self).__init__(examples, fields, **kwargs)
-
-    def split(self, split_ratio=0.8, stratified=False, strata_field='target',
-              random_state=None):
-        splits = super().split(split_ratio, stratified=stratified, strata_field=strata_field, random_state=random_state)
-        return [splits]
-
-    def split_kfold(self, k, stratified=False, strata_field='target', is_test=False, random_state=None):
-        rnd = RandomShuffler(random_state)
-        if stratified:
-            strata = stratify(self.examples, strata_field)
-            group_generators = [self.iter_folds(group, k, rnd, is_test) for group in strata]
-            for fold_data in zip(*group_generators):
-                split_data = list(zip(*fold_data))
-                split_data = [[e for g in data for e in g]
-                                                   for data in split_data]
-                splits = self.make_datasets(split_data)
-                yield splits
-        else:
-            for fold_data in self.iter_folds(self.examples, k, rnd, is_test):
-                splits = self.make_datasets(fold_data)
-                yield splits
-
-    def make_datasets(self, split_data):
-        split_data = [data for data in split_data if len(data) > 0]
-        percents = [sum([int(e.target) for e in data]) / len(data) * 100 for data in split_data]
-        print('percent of toxic questions for train_val_test data: ', percents)
-        splits = tuple(Dataset(d, self.fields) for d in split_data)
-        if self.sort_key:
-            for subset in splits:
-                subset.sort_key = self.sort_key
-        return splits
-
-    def iter_folds(self, examples, k, rnd, is_test):
-        N = len(examples)
-        randperm = rnd(range(N))
-        fold_len = int(N / k)
-        cut_idxs = [e * fold_len for e in list(range(k))] + [N]
-        i = 0
-        while i < k:
-            train_index, val_index, test_index = k_split_indices(randperm, cut_idxs, k, i, is_test)
-            train_data, val_data, test_data = tuple([examples[idx] for idx in index]
-                                                    for index in [train_index, val_index, test_index])
-            i += 1
-            yield train_data, val_data, test_data
-
-
-def k_split_indices(randperm, cut_idxs, k, i, is_test):
-    time_start = time.time()
-
-    # val index
-    val_start_idx = cut_idxs[i]
-    val_end_idx = cut_idxs[i + 1]
-    val_index = randperm[val_start_idx:val_end_idx]
-
-    # test index
-    if is_test:
-        if i <= k - 2:
-            test_start_idx = cut_idxs[i + 1]
-            test_end_idx = cut_idxs[i + 2]
-        else:
-            test_start_idx = cut_idxs[0]
-            test_end_idx = cut_idxs[1]
-        test_index = randperm[test_start_idx:test_end_idx]
-    else:
-        test_index = []
-    val_test_index = set(val_index + test_index)
-    # train index
-    print_duration(time_start, message='k_split_indices time')
-    train_index = [idx for idx in randperm if idx not in val_test_index]
-    print_duration(time_start, message='k_split_indices time')
-    return train_index, val_index, test_index
-
-
-class MyVectors(Vectors):
-    # def __init__(self, *args, **kwargs):
-    #    self.tokens = 0
-    #    super(MyVectors, self).__init__(*args, *kwargs)
-    def __init__(self, name, cache=None, to_cache=True,
-                 url=None, unk_init=None, max_vectors=None):
+        :param paths:
+        :param new_dir:
+        :param n:
+        :param string:
+        :return: Paths for small datasets
         """
-        Arguments:
-           name: name of the file that contains the vectors
-           cache: directory for cached vectors
-           url: url for download if vectors not found in cache
-           unk_init (callback): by default, initialize out-of-vocabulary word vectors
-               to zero vectors; can be any function that takes in a Tensor and
-               returns a Tensor of the same size
-           max_vectors (int): this can be used to limit the number of
-               pre-trained vectors loaded.
-               Most pre-trained vector sets are sorted
-               in the descending order of word frequency.
-               Thus, in situations where the entire set doesn't fit in memory,
-               or is not needed for another reason, passing `max_vectors`
-               can limit the size of the loaded set.
-         """
-        cache = '.vector_cache' if cache is None else cache
-        self.itos = None
-        self.stoi = None
-        self.vectors = None
-        self.dim = None
-        self.unk_init = torch.Tensor.zero_ if unk_init is None else unk_init
-        if to_cache:
-            self.cache(name, cache, url=url, max_vectors=max_vectors)
-        else:
-            self.load(name, max_vectors=max_vectors)
+        small_paths = []
 
-    def __getitem__(self, token):
-        if token in self.stoi:
-            # self.tokens += 1
-            # print(self.tokens, self.low_tokens)
-            return self.vectors[self.stoi[token]]
-        elif token.lower() in self.stoi:
-            # self.low_tokens += 1
-            return self.vectors[self.stoi[token.lower()]]
-        else:
-            return self.unk_init(torch.Tensor(self.dim))
-
-    def cache(self, name, cache, url=None, max_vectors=None):
-        if os.path.isfile(name):
-            path = name
-            if max_vectors:
-                file_suffix = '_{}.pt'.format(max_vectors)
-            else:
-                file_suffix = '.pt'
-            path_pt = os.path.join(cache, os.path.basename(name)) + file_suffix
-        else:
-            path = os.path.join(cache, name)
-            if max_vectors:
-                file_suffix = '_{}.pt'.format(max_vectors)
-            else:
-                file_suffix = '.pt'
-            path_pt = path + file_suffix
-
-        if not os.path.isfile(path_pt):
-            if not os.path.isfile(path) and url:
-                logger.info('Downloading vectors from {}'.format(url))
-                if not os.path.exists(cache):
-                    os.makedirs(cache)
-                dest = os.path.join(cache, os.path.basename(url))
-                if not os.path.isfile(dest):
-                    with tqdm(unit='B', unit_scale=True, miniters=1, desc=dest) as t:
-                        try:
-                            urlretrieve(url, dest, reporthook=reporthook(t))
-                        except KeyboardInterrupt as e:  # remove the partial zip file
-                            os.remove(dest)
-                            raise e
-                logger.info('Extracting vectors into {}'.format(cache))
-                ext = os.path.splitext(dest)[1][1:]
-                if ext == 'zip':
-                    with zipfile.ZipFile(dest, "r") as zf:
-                        zf.extractall(cache)
-                elif ext == 'gz':
-                    if dest.endswith('.tar.gz'):
-                        with tarfile.open(dest, 'r:gz') as tar:
-                            tar.extractall(path=cache)
-            if not os.path.isfile(path):
-                raise RuntimeError('no vectors found at {}'.format(path))
-
-            logger.info("Loading vectors from {}".format(path))
-
-            itos, vectors, dim = read_emb(path, max_vectors)
-
-            self.itos = itos
-            self.stoi = {word: i for i, word in enumerate(itos)}
-            self.vectors = torch.Tensor(vectors).view(-1, dim)
-            self.dim = dim
-            logger.info('Saving vectors to {}'.format(path_pt))
-            if not os.path.exists(cache):
-                os.makedirs(cache)
-            torch.save((self.itos, self.stoi, self.vectors, self.dim), path_pt)
-        else:
-            logger.info('Loading vectors from {}'.format(path_pt))
-            self.itos, self.stoi, self.vectors, self.dim = torch.load(path_pt)
-
-    def load(self, path, max_vectors=None):
-        print('Loading embedding vectors. No cache')
-        if not os.path.isfile(path):
-            raise RuntimeError('no vectors found at {}'.format(path))
-
-        logger.info("Loading vectors from {}".format(path))
-
-        itos, vectors, dim = read_emb(path, max_vectors)
-
-        self.itos = itos
-        self.stoi = {word: i for i, word in enumerate(itos)}
-        self.vectors = torch.Tensor(vectors).view(-1, dim)
-        self.dim = dim
+        for p in paths:
+            new_path = change_dir_in_path(p, new_dir)
+            root, ext = os.path.splitext(new_path)
+            small_path = f'{root}_{string}{n}{ext}'
+            small_paths.append(small_path)
+        return small_paths
 
 
-def read_emb(path, max_vectors):
-    ext = os.path.splitext(path)[1][1:]
-    if ext == 'bin':
-        itos, vectors, dim = emb_from_bin(path, max_vectors)
+def change_dir_in_path(path, new_dir):
+    _, file_name = os.path.split(path)
+    new_path = os.path.join(new_dir, file_name)
+    return new_path
+
+
+
+def reduce_datasets(csv_names, new_dir, n, rand=False, seed=None):
+    dfs = read_datasets_to_df(csv_names)
+    exists = True
+    if rand:
+        seed = 42 if None else seed
+        small_paths = small_ds_paths(csv_names, new_dir, n, 'rand')
+        for sp in small_paths:
+            if not os.path.exists(sp):
+                exists = False
+        if not exists:
+            small_dfs = [df.sample(n) for df in dfs]
+            dfs_to_csv(small_dfs, small_paths)
+
     else:
-        itos, vectors, dim = emb_from_txt(path, ext, max_vectors)
-    return itos, vectors, dim
+        small_paths = small_ds_paths(csv_names, new_dir, n, 'head')
+        for sp in small_paths:
+            if not os.path.exists(sp):
+                exists = False
+        if not exists:
+            small_dfs = [df.head(n) for df in dfs]
+            dfs_to_csv(small_dfs, small_paths)
+    return small_paths
 
 
-def emb_from_txt(path, ext, max_vectors):
-    if ext == 'gz':
-        open_file = gzip.open
+def reduce_embedding(emb_path, new_dir, n):
+    small_emb_path = small_ds_paths([emb_path], new_dir, n, 'head')[0]
+    if not os.path.exists(small_emb_path):
+        with open(emb_path, 'r') as f:
+            head = [next(f) for i in range(n)]
+        with open(small_emb_path, 'w') as f:
+            f.write(''.join(head))
+    return small_emb_path
+
+
+
+def _submit(test_ids, predictoins, subm_name):
+    sub_df = pd.DataFrame()
+    sub_df['qid'] = test_ids
+    sub_df['prediction'] = predictoins
+    sub_df.to_csv(subm_name, index=False)
+
+
+def submit(test_ids, labels, probs, subm_name='submission.csv'):
+    _submit(test_ids, labels, subm_name)
+    pred_to_csv(test_ids, probs, labels, 'test_probs.csv')
+    print(f'predictions saved in {subm_name}, test_probs.csv file')
+
+
+def f1_metric(tp, n_targs, n_preds):
+    if n_preds == 0 or n_targs == 0 or tp == 0:
+        f1 = 0
     else:
-        open_file = open
-
-    vectors_loaded = 0
-    with open_file(path, 'rb') as f:
-        num_lines, dim = _infer_shape(f)
-        if not max_vectors or max_vectors > num_lines:
-            max_vectors = num_lines
-
-        itos, vectors, dim = [], torch.zeros((max_vectors, dim)), None
-
-        for line in f:
-            # get rid of Unicode non-breaking spaces in the vectors.
-            entries = line.rstrip().split(b" ")
-
-            word, entries = entries[0], entries[1:]
-            if dim is None and len(entries) > 1:
-                dim = len(entries)
-            elif len(entries) == 1:
-                logger.warning("Skipping token {} with 1-dimensional "
-                               "vector {}; likely a header".format(word, entries))
-                continue
-            elif dim != len(entries):
-                raise RuntimeError(
-                    "Vector for token {} has {} dimensions, but previously "
-                    "read vectors have {} dimensions. All vectors must have "
-                    "the same number of dimensions.".format(word, len(entries),
-                                                            dim))
-
-            try:
-                if isinstance(word, six.binary_type):
-                    word = word.decode('utf-8')
-            except UnicodeDecodeError:
-                logger.info("Skipping non-UTF8 token {}".format(repr(word)))
-                continue
-
-            vectors[vectors_loaded] = torch.tensor([float(x) for x in entries])
-            vectors_loaded += 1
-            itos.append(word)
-
-            if vectors_loaded == max_vectors:
-                break
-
-    return itos, vectors, dim
+        prec = tp/n_preds
+        rec = tp/n_targs
+        print('prec: ', prec, 'rec: ', rec)
+        f1 = 2 * rec * prec / (rec + prec)
+    return f1
 
 
-def emb_from_bin(path, max_vectors):
-    emb_index = KeyedVectors.load_word2vec_format(path, limit=max_vectors, binary=True)
-    itos = emb_index.index2word
-    vectors = emb_index.vectors
-    dim = emb_index.vector_size
-    return itos, vectors, dim
+def print_duration(time_start, message):
+    time_end = time.time()
+    seconds = int(time_end - time_start)
+    tr_time = timedelta(seconds=seconds)
+    print(f'{message}{tr_time}')
+    minutes = seconds/60
+    return minutes
 
 
-def _infer_shape(f):
-    num_lines, vector_dim = 0, None
-    for line in f:
-        if vector_dim is None:
-            row = line.rstrip().split(b" ")
-            vector = row[1:]
-            # Assuming word, [vector] format
-            if len(vector) > 2:
-                # The header present in some (w2v) formats contains two elements.
-                vector_dim = len(vector)
-                num_lines += 1  # First element read
-        else:
-            num_lines += 1
-    f.seek(0)
-    return num_lines, vector_dim
+def get_hash():
+    hash = subprocess.check_output(['git', 'describe', '--always'])
+    hash = hash.decode("utf-8")[1:-1]
+    return hash
 
+
+def str_date_time():
+    struct_time = time.localtime()
+    date_time = time.strftime('%b_%d_%Y__%H_%M_%S', struct_time)
+    return date_time
+
+
+def dict_to_csv(dict, csvname, mode, orient, reverse=False, header=True):
+    if orient == 'index':
+        df = pd.DataFrame.from_dict(dict, orient='index')
+        df.to_csv(csvname, header=False, mode=mode)
+    if orient == 'columns':
+        df = pd.DataFrame(dict, index=[0])
+        if reverse: #reverse dataframe columnes
+            df = df.iloc[:, ::-1]
+        df.to_csv(csvname, index=False, mode=mode, header=header)
+    # TODO: append rows considering columns names
+
+
+def check_changes_commited():
+    message = subprocess.check_output(['git', 'status'])
+    message_last_line = str(message.decode("utf-8")).split('\n')[-2]
+    required_last_line = 'nothing to commit, working tree clean'
+    if message_last_line == required_last_line:
+        status = True
+    else:
+        status = False
+    return status
+
+
+def save_plot(record, key, n_eval, fname):
+    y = [o[key] for o in record]
+    x = np.array(range(len(y))) / n_eval
+    fig, ax = plt.subplots(1, 1)
+    ax.plot(x, y)
+    ax.set_xlabel('epoch')
+    ax.set_ylabel(key)
+    fig.savefig(fname)
+
+
+def save_plots(records, keys, labels, n_eval):
+    for k in keys:
+        fig, ax = plt.subplots(1, 1)
+        ax.set_xlabel('epoch')
+        ax.set_ylabel(k)
+        for r, l in zip(records, labels):
+            y = [o[k] for o in r]
+            x = np.array(range(len(y))) / n_eval
+            ax.plot(x, y, label=l)
+        plt.legend()
+        fname = k + '.png'
+        fig.savefig(fname)
+        plt.close()
+
+
+def copy_files(arg_list, dest_dir):
+    for a in arg_list:
+        for file in glob.glob(a):
+            shutil.copy(file, dest_dir)
+
+
+def pred_to_csv(ids, y_pred, y_true, fpath='val_probs.csv', mode='w'):
+    df = pd.DataFrame()
+    df['qid'] = ids
+    df['prediction'] = y_pred
+    df['true_label'] = y_true
+    header = True if mode == 'w' else False
+    df.to_csv(fpath, index=False, mode=mode, header=header)
 
 def section_sizes_and_lengths(lengths):
     bs = len(lengths)
@@ -838,252 +675,351 @@ class LinPool3(nn.Module):
         average_pool = torch.mean(x_cat, 1)
         long_output = torch.cat((max_pool, average_pool), dim=1)
         y = self.fc4(self.dropout(long_output))
-        return y
-
-def _submit(test_ids, predictoins, subm_name):
-    sub_df = pd.DataFrame()
-    sub_df['qid'] = test_ids
-    sub_df['prediction'] = predictoins
-    sub_df.to_csv(subm_name, index=False)
+        return y# Overriding torchtext methods
 
 
-def submit(test_ids, labels, probs, subm_name='submission.csv'):
-    _submit(test_ids, labels, subm_name)
-    pred_to_csv(test_ids, probs, labels, 'test_probs.csv')
-    print(f'predictions saved in {subm_name}, test_probs.csv file')
+class MyTabularDataset(TabularDataset):
+    """Subclass of torch.data.dataset.TabularDataset for k-fold cross-validation"""
+    def __init__(self, path, format, fields, skip_header=False,
+                 csv_reader_params={}, **kwargs):
+        """Create a TabularDataset given a path, file format, and field list.
 
+        Arguments:
+            path (str): Path to the data file.
+            format (str): The format of the data file. One of "CSV", "TSV", or
+                "JSON" (case-insensitive).
+            fields (list(tuple(str, Field)) or dict[str: tuple(str, Field)]:
+                If using a list, the format must be CSV or TSV, and the values of the list
+                should be tuples of (name, field).
+                The fields should be in the same order as the columns in the CSV or TSV
+                file, while tuples of (name, None) represent columns that will be ignored.
 
-def f1_metric(tp, n_targs, n_preds):
-    if n_preds == 0 or n_targs == 0 or tp == 0:
-        f1 = 0
-    else:
-        prec = tp/n_preds
-        rec = tp/n_targs
-        print('prec: ', prec, 'rec: ', rec)
-        f1 = 2 * rec * prec / (rec + prec)
-    return f1
-
-
-def print_duration(time_start, message):
-    time_end = time.time()
-    seconds = int(time_end - time_start)
-    tr_time = timedelta(seconds=seconds)
-    print(f'{message}{tr_time}')
-    minutes = seconds/60
-    return minutes
-
-
-def get_hash():
-    hash = subprocess.check_output(['git', 'describe', '--always'])
-    hash = hash.decode("utf-8")[1:-1]
-    return hash
-
-
-def str_date_time():
-    struct_time = time.localtime()
-    date_time = time.strftime('%b_%d_%Y__%H_%M_%S', struct_time)
-    return date_time
-
-
-def dict_to_csv(dict, csvname, mode, orient, reverse=False, header=True):
-    if orient == 'index':
-        df = pd.DataFrame.from_dict(dict, orient='index')
-        df.to_csv(csvname, header=False, mode=mode)
-    if orient == 'columns':
-        df = pd.DataFrame(dict, index=[0])
-        if reverse: #reverse dataframe columnes
-            df = df.iloc[:, ::-1]
-        df.to_csv(csvname, index=False, mode=mode, header=header)
-    # TODO: append rows considering columns names
-
-
-def check_changes_commited():
-    message = subprocess.check_output(['git', 'status'])
-    message_last_line = str(message.decode("utf-8")).split('\n')[-2]
-    required_last_line = 'nothing to commit, working tree clean'
-    if message_last_line == required_last_line:
-        status = True
-    else:
-        status = False
-    return status
-
-
-def save_plot(record, key, n_eval, fname):
-    y = [o[key] for o in record]
-    x = np.array(range(len(y))) / n_eval
-    fig, ax = plt.subplots(1, 1)
-    ax.plot(x, y)
-    ax.set_xlabel('epoch')
-    ax.set_ylabel(key)
-    fig.savefig(fname)
-
-
-def save_plots(records, keys, labels, n_eval):
-    for k in keys:
-        fig, ax = plt.subplots(1, 1)
-        ax.set_xlabel('epoch')
-        ax.set_ylabel(k)
-        for r, l in zip(records, labels):
-            y = [o[k] for o in r]
-            x = np.array(range(len(y))) / n_eval
-            ax.plot(x, y, label=l)
-        plt.legend()
-        fname = k + '.png'
-        fig.savefig(fname)
-        plt.close()
-
-
-def copy_files(arg_list, dest_dir):
-    for a in arg_list:
-        for file in glob.glob(a):
-            shutil.copy(file, dest_dir)
-
-
-def pred_to_csv(ids, y_pred, y_true, fpath='val_probs.csv', mode='w'):
-    df = pd.DataFrame()
-    df['qid'] = ids
-    df['prediction'] = y_pred
-    df['true_label'] = y_true
-    header = True if mode == 'w' else False
-    df.to_csv(fpath, index=False, mode=mode, header=header)
-
-def ens_mean(preds, y_true, args):
-    return np.mean(np.array(preds), 0)
-
-
-def ens_weight(y_preds, y_true, args):
-    weights = args.weights
-    y_preds = np.transpose(np.array(y_preds))
-    if not weights:
-        X = y_preds
-        y = np.transpose(y_true)
-        reg = LinearRegression(fit_intercept=False).fit(X, y)
-        print('lin reg score: ', reg.score(X, y))
-        weights = reg.coef_
-        print('weights: ', weights)
-    weights = np.array(weights)
-    final_pred = np.transpose(y_preds.dot(weights))
-    return final_pred
-
-
-methods = {'mean': ens_mean,
-           'weight': ens_weight}
-# list of possible models for ensemble
-
-
-model_dict = {
-    'wnews': ('Jan_10_2019__21:56:52', '-es 3 -e 10 -em wnews  -hd 150 -we 10 --lrstep 10'), # 827
-    'glove': ('Jan_10_2019__22:10:15', '-es 2 -e 9 -hd 150'), # 829
-    'paragram': ('Jan_11_2019__11:10:57', '-hd 150 -es 2 -e 10 -em paragram -t lowerspacy -us 0'), #873
-    'gnews': ('Jan_11_2019__20:21:01', '-em gnews -es 2 -e 10 -hd 150 -us 0.1'), # 889
-    'gnews_num': ('Jan_12_2019__22:13:37', '-em gnews -t gnews_num -es 2 -e 10 -us 0.1 -hd 150'), # 927
-    'wnews_test': ('Jan_10_2019__19:33:05_test', '--mode test -em wnews'),
-    'glove_test': ('Jan_10_2019__19:34:39_test', '--mode test -em glove'),
-    'glove_cv': ('Jan_17_2019__17_59_36', '-hd 150 -k 5 -ne 3'),  # 1077
-    'paragram_cv': ('Jan_15_2019__04_23_16', '-k 5 -hd 150 -e 10 -em paragram -t lowerspacy -us 0.1'), #983 ! try -ne 3
-    'wnews_cv': ('Jan_11_2019__05:09:58', '-es 3 -e 10 -em wnews -m BiLSTMPoolTest -vl -hd 150 -we 10 --lrstep 20 -k 5 -us 0.1'), #855
-    'gnews_cv': ('Jan_18_2019__15_06_29', '-em gnews -es 2 -e 10 -hd 150 -us 0.1 -k 5 -ne 3'),  # 1113
-    'gnews_num_cv': ('Jan_18_2019__16_45_38', '-em gnews -e 10 -hd 150 -us 0.1 -k 5 -ne 3 -t gnews_num'), # 1119
-    'gnews_ph_cv': ('Jan_19_2019__16_05_11', '-em gnews -e 10 -hd 150 -ne 3 -t gnews_ph -k 5 -us 0.1'), #1189
-    'gnews_ph_num_cv': ('Jan_19_2019__18_56_02', '-em gnews -e 10 -hd 150 -ne 3 -t gnews_ph_num -k 5 -us 0.1'),  #1195
-    'gnews_cv_2': ('Jan_20_2019__08_17_29', '-em gnews -e 12 -hd 150 -ne 3 -k 5 -us 0.1 -lr 0.002'),  #1234
-    'wnews_cv_2': ('Jan_21_2019__00_07_54', '-em wnews -e 12 -hd 150 -ne 3 -k 5 -us 0.1 -lr 0.002'), #1288
-    'wnews_cv_3': ('Jan_21_2019__22_08_57', '-em wnews -e 12 -hd 150 -ne 3 -k 5 -us 0.1 -lr 0.0025 -we 10'), #1334 ! try --lrstep 2
-    'linpool4_cv': ('Feb_01_2019__16_06_28', '-k 5 -m LinPool4 -em glove paragram wnews gnews -we 20 -e 10'), #1501
-    'linpool3_cv': ('Feb_03_2019__14_41_27', '-k 5 -m LinPool3 -em glove paragram wnews -e 10 -lr 0.002 -we 20') #1589
-}
-# functions for choosing tokenizer, optimizer and model
-
-
-def choose_model(model_name, text, n_layers, hidden_dim, dropout):
-    model = globals()[model_name](text.vocab.vectors,
-                       lstm_layer=n_layers,
-                       padding_idx=text.vocab.stoi[text.pad_token],
-                       hidden_dim=hidden_dim,
-                       dropout=dropout).cuda()
-    return model
-
-
-def choose_optimizer(params, args):
-    if args.optim == 'Adam':
-        optimizer = optim.Adam(params, lr=args.lr)
-    elif args.optim == 'AdamW':
-        optimizer = optim.Adam(params, lr=args.lr, betas=(0.9, 0.99))
-    return optimizer
-def read_datasets_to_df(datasets):
-    dfs = []
-    for d in datasets:
-        dfs.append(pd.read_csv(d))
-    return dfs
-
-
-def dfs_to_csv(dfs, csv_names):
-    if len(dfs) != len(csv_names):
-        raise Exception('len(dfs) != len(csv_names)')
-
-    for df, name in zip(dfs, csv_names):
-        df.to_csv(name)
-    return csv_names
-
-
-def small_ds_paths(paths, new_dir, n, string):
+                If using a dict, the keys should be a subset of the JSON keys or CSV/TSV
+                columns, and the values should be tuples of (name, field).
+                Keys not present in the input dictionary are ignored.
+                This allows the user to rename columns from their JSON/CSV/TSV key names
+                and also enables selecting a subset of columns to load.
+            skip_header (bool): Whether to skip the first line of the input file.
+            csv_reader_params(dict): Parameters to pass to the csv reader.
+                Only relevant when format is csv or tsv.
+                See
+                https://docs.python.org/3/library/csv.html#csv.reader
+                for more details.
         """
-        :param paths:
-        :param new_dir:
-        :param n:
-        :param string:
-        :return: Paths for small datasets
-        """
-        small_paths = []
 
-        for p in paths:
-            new_path = change_dir_in_path(p, new_dir)
-            root, ext = os.path.splitext(new_path)
-            small_path = f'{root}_{string}{n}{ext}'
-            small_paths.append(small_path)
-        return small_paths
+        cache_path = os.path.join('.', (os.path.basename(path) + '.td'))
+        try:
+            with open(cache_path, 'rb') as f:
+                examples = pickle.load(f)
+        except:
+            format = format.lower()
+            make_example = {
+                'json': Example.fromJSON, 'dict': Example.fromdict,
+                'tsv': Example.fromCSV, 'csv': Example.fromCSV}[format]
+
+            with io.open(os.path.expanduser(path), encoding="utf8") as f:
+                if format == 'csv':
+                    reader = unicode_csv_reader(f, **csv_reader_params)
+                elif format == 'tsv':
+                    reader = unicode_csv_reader(f, delimiter='\t', **csv_reader_params)
+                else:
+                    reader = f
+
+                if format in ['csv', 'tsv'] and isinstance(fields, dict):
+                    if skip_header:
+                        raise ValueError('When using a dict to specify fields with a {} file,'
+                                         'skip_header must be False and'
+                                         'the file must have a header.'.format(format))
+                    header = next(reader)
+                    field_to_index = {f: header.index(f) for f in fields.keys()}
+                    make_example = partial(make_example, field_to_index=field_to_index)
+
+                if skip_header:
+                    next(reader)
+
+                examples = [make_example(line, fields) for line in reader]
+                with open(cache_path, 'wb') as f:
+                    pickle.dump(examples, f)
+
+        if isinstance(fields, dict):
+            fields, field_dict = [], fields
+            for field in field_dict.values():
+                if isinstance(field, list):
+                    fields.extend(field)
+                else:
+                    fields.append(field)
+
+        super(TabularDataset, self).__init__(examples, fields, **kwargs)
+
+    def split(self, split_ratio=0.8, stratified=False, strata_field='target',
+              random_state=None):
+        splits = super().split(split_ratio, stratified=stratified, strata_field=strata_field, random_state=random_state)
+        return [splits]
+
+    def split_kfold(self, k, stratified=False, strata_field='target', is_test=False, random_state=None):
+        rnd = RandomShuffler(random_state)
+        if stratified:
+            strata = stratify(self.examples, strata_field)
+            group_generators = [self.iter_folds(group, k, rnd, is_test) for group in strata]
+            for fold_data in zip(*group_generators):
+                split_data = list(zip(*fold_data))
+                split_data = [[e for g in data for e in g]
+                                                   for data in split_data]
+                splits = self.make_datasets(split_data)
+                yield splits
+        else:
+            for fold_data in self.iter_folds(self.examples, k, rnd, is_test):
+                splits = self.make_datasets(fold_data)
+                yield splits
+
+    def make_datasets(self, split_data):
+        split_data = [data for data in split_data if len(data) > 0]
+        percents = [sum([int(e.target) for e in data]) / len(data) * 100 for data in split_data]
+        print('percent of toxic questions for train_val_test data: ', percents)
+        splits = tuple(Dataset(d, self.fields) for d in split_data)
+        if self.sort_key:
+            for subset in splits:
+                subset.sort_key = self.sort_key
+        return splits
+
+    def iter_folds(self, examples, k, rnd, is_test):
+        N = len(examples)
+        randperm = rnd(range(N))
+        fold_len = int(N / k)
+        cut_idxs = [e * fold_len for e in list(range(k))] + [N]
+        i = 0
+        while i < k:
+            train_index, val_index, test_index = k_split_indices(randperm, cut_idxs, k, i, is_test)
+            train_data, val_data, test_data = tuple([examples[idx] for idx in index]
+                                                    for index in [train_index, val_index, test_index])
+            i += 1
+            yield train_data, val_data, test_data
 
 
-def change_dir_in_path(path, new_dir):
-    _, file_name = os.path.split(path)
-    new_path = os.path.join(new_dir, file_name)
-    return new_path
+def k_split_indices(randperm, cut_idxs, k, i, is_test):
+    time_start = time.time()
 
+    # val index
+    val_start_idx = cut_idxs[i]
+    val_end_idx = cut_idxs[i + 1]
+    val_index = randperm[val_start_idx:val_end_idx]
 
-
-def reduce_datasets(csv_names, new_dir, n, rand=False, seed=None):
-    dfs = read_datasets_to_df(csv_names)
-    exists = True
-    if rand:
-        seed = 42 if None else seed
-        small_paths = small_ds_paths(csv_names, new_dir, n, 'rand')
-        for sp in small_paths:
-            if not os.path.exists(sp):
-                exists = False
-        if not exists:
-            small_dfs = [df.sample(n) for df in dfs]
-            dfs_to_csv(small_dfs, small_paths)
-
+    # test index
+    if is_test:
+        if i <= k - 2:
+            test_start_idx = cut_idxs[i + 1]
+            test_end_idx = cut_idxs[i + 2]
+        else:
+            test_start_idx = cut_idxs[0]
+            test_end_idx = cut_idxs[1]
+        test_index = randperm[test_start_idx:test_end_idx]
     else:
-        small_paths = small_ds_paths(csv_names, new_dir, n, 'head')
-        for sp in small_paths:
-            if not os.path.exists(sp):
-                exists = False
-        if not exists:
-            small_dfs = [df.head(n) for df in dfs]
-            dfs_to_csv(small_dfs, small_paths)
-    return small_paths
+        test_index = []
+    val_test_index = set(val_index + test_index)
+    # train index
+    print_duration(time_start, message='k_split_indices time')
+    train_index = [idx for idx in randperm if idx not in val_test_index]
+    print_duration(time_start, message='k_split_indices time')
+    return train_index, val_index, test_index
 
 
-def reduce_embedding(emb_path, new_dir, n):
-    small_emb_path = small_ds_paths([emb_path], new_dir, n, 'head')[0]
-    if not os.path.exists(small_emb_path):
-        with open(emb_path, 'r') as f:
-            head = [next(f) for i in range(n)]
-        with open(small_emb_path, 'w') as f:
-            f.write(''.join(head))
-    return small_emb_path
+class MyVectors(Vectors):
+    # def __init__(self, *args, **kwargs):
+    #    self.tokens = 0
+    #    super(MyVectors, self).__init__(*args, *kwargs)
+    def __init__(self, name, cache=None, to_cache=True,
+                 url=None, unk_init=None, max_vectors=None):
+        """
+        Arguments:
+           name: name of the file that contains the vectors
+           cache: directory for cached vectors
+           url: url for download if vectors not found in cache
+           unk_init (callback): by default, initialize out-of-vocabulary word vectors
+               to zero vectors; can be any function that takes in a Tensor and
+               returns a Tensor of the same size
+           max_vectors (int): this can be used to limit the number of
+               pre-trained vectors loaded.
+               Most pre-trained vector sets are sorted
+               in the descending order of word frequency.
+               Thus, in situations where the entire set doesn't fit in memory,
+               or is not needed for another reason, passing `max_vectors`
+               can limit the size of the loaded set.
+         """
+        cache = '.vector_cache' if cache is None else cache
+        self.itos = None
+        self.stoi = None
+        self.vectors = None
+        self.dim = None
+        self.unk_init = torch.Tensor.zero_ if unk_init is None else unk_init
+        if to_cache:
+            self.cache(name, cache, url=url, max_vectors=max_vectors)
+        else:
+            self.load(name, max_vectors=max_vectors)
 
+    def __getitem__(self, token):
+        if token in self.stoi:
+            # self.tokens += 1
+            # print(self.tokens, self.low_tokens)
+            return self.vectors[self.stoi[token]]
+        elif token.lower() in self.stoi:
+            # self.low_tokens += 1
+            return self.vectors[self.stoi[token.lower()]]
+        else:
+            return self.unk_init(torch.Tensor(self.dim))
+
+    def cache(self, name, cache, url=None, max_vectors=None):
+        if os.path.isfile(name):
+            path = name
+            if max_vectors:
+                file_suffix = '_{}.pt'.format(max_vectors)
+            else:
+                file_suffix = '.pt'
+            path_pt = os.path.join(cache, os.path.basename(name)) + file_suffix
+        else:
+            path = os.path.join(cache, name)
+            if max_vectors:
+                file_suffix = '_{}.pt'.format(max_vectors)
+            else:
+                file_suffix = '.pt'
+            path_pt = path + file_suffix
+
+        if not os.path.isfile(path_pt):
+            if not os.path.isfile(path) and url:
+                logger.info('Downloading vectors from {}'.format(url))
+                if not os.path.exists(cache):
+                    os.makedirs(cache)
+                dest = os.path.join(cache, os.path.basename(url))
+                if not os.path.isfile(dest):
+                    with tqdm(unit='B', unit_scale=True, miniters=1, desc=dest) as t:
+                        try:
+                            urlretrieve(url, dest, reporthook=reporthook(t))
+                        except KeyboardInterrupt as e:  # remove the partial zip file
+                            os.remove(dest)
+                            raise e
+                logger.info('Extracting vectors into {}'.format(cache))
+                ext = os.path.splitext(dest)[1][1:]
+                if ext == 'zip':
+                    with zipfile.ZipFile(dest, "r") as zf:
+                        zf.extractall(cache)
+                elif ext == 'gz':
+                    if dest.endswith('.tar.gz'):
+                        with tarfile.open(dest, 'r:gz') as tar:
+                            tar.extractall(path=cache)
+            if not os.path.isfile(path):
+                raise RuntimeError('no vectors found at {}'.format(path))
+
+            logger.info("Loading vectors from {}".format(path))
+
+            itos, vectors, dim = read_emb(path, max_vectors)
+
+            self.itos = itos
+            self.stoi = {word: i for i, word in enumerate(itos)}
+            self.vectors = torch.Tensor(vectors).view(-1, dim)
+            self.dim = dim
+            logger.info('Saving vectors to {}'.format(path_pt))
+            if not os.path.exists(cache):
+                os.makedirs(cache)
+            torch.save((self.itos, self.stoi, self.vectors, self.dim), path_pt)
+        else:
+            logger.info('Loading vectors from {}'.format(path_pt))
+            self.itos, self.stoi, self.vectors, self.dim = torch.load(path_pt)
+
+    def load(self, path, max_vectors=None):
+        print('Loading embedding vectors. No cache')
+        if not os.path.isfile(path):
+            raise RuntimeError('no vectors found at {}'.format(path))
+
+        logger.info("Loading vectors from {}".format(path))
+
+        itos, vectors, dim = read_emb(path, max_vectors)
+
+        self.itos = itos
+        self.stoi = {word: i for i, word in enumerate(itos)}
+        self.vectors = torch.Tensor(vectors).view(-1, dim)
+        self.dim = dim
+
+
+def read_emb(path, max_vectors):
+    ext = os.path.splitext(path)[1][1:]
+    if ext == 'bin':
+        itos, vectors, dim = emb_from_bin(path, max_vectors)
+    else:
+        itos, vectors, dim = emb_from_txt(path, ext, max_vectors)
+    return itos, vectors, dim
+
+
+def emb_from_txt(path, ext, max_vectors):
+    if ext == 'gz':
+        open_file = gzip.open
+    else:
+        open_file = open
+
+    vectors_loaded = 0
+    with open_file(path, 'rb') as f:
+        num_lines, dim = _infer_shape(f)
+        if not max_vectors or max_vectors > num_lines:
+            max_vectors = num_lines
+
+        itos, vectors, dim = [], torch.zeros((max_vectors, dim)), None
+
+        for line in f:
+            # get rid of Unicode non-breaking spaces in the vectors.
+            entries = line.rstrip().split(b" ")
+
+            word, entries = entries[0], entries[1:]
+            if dim is None and len(entries) > 1:
+                dim = len(entries)
+            elif len(entries) == 1:
+                logger.warning("Skipping token {} with 1-dimensional "
+                               "vector {}; likely a header".format(word, entries))
+                continue
+            elif dim != len(entries):
+                raise RuntimeError(
+                    "Vector for token {} has {} dimensions, but previously "
+                    "read vectors have {} dimensions. All vectors must have "
+                    "the same number of dimensions.".format(word, len(entries),
+                                                            dim))
+
+            try:
+                if isinstance(word, six.binary_type):
+                    word = word.decode('utf-8')
+            except UnicodeDecodeError:
+                logger.info("Skipping non-UTF8 token {}".format(repr(word)))
+                continue
+
+            vectors[vectors_loaded] = torch.tensor([float(x) for x in entries])
+            vectors_loaded += 1
+            itos.append(word)
+
+            if vectors_loaded == max_vectors:
+                break
+
+    return itos, vectors, dim
+
+
+def emb_from_bin(path, max_vectors):
+    emb_index = KeyedVectors.load_word2vec_format(path, limit=max_vectors, binary=True)
+    itos = emb_index.index2word
+    vectors = emb_index.vectors
+    dim = emb_index.vector_size
+    return itos, vectors, dim
+
+
+def _infer_shape(f):
+    num_lines, vector_dim = 0, None
+    for line in f:
+        if vector_dim is None:
+            row = line.rstrip().split(b" ")
+            vector = row[1:]
+            # Assuming word, [vector] format
+            if len(vector) > 2:
+                # The header present in some (w2v) formats contains two elements.
+                vector_dim = len(vector)
+                num_lines += 1  # First element read
+        else:
+            num_lines += 1
+    f.seek(0)
+    return num_lines, vector_dim
 
 
 
@@ -1193,7 +1129,70 @@ def iterate(train, val, test, batch_size):
     return train_iter, val_iter, test_iter
 
 
-    pred_to_csv
+
+
+def ens_mean(preds, y_true=None, args=None):
+    return np.mean(np.array(preds), 0)
+
+
+def ens_weight(y_preds, y_true=None, args=None):
+    weights = args.weights
+    y_preds = np.transpose(np.array(y_preds))
+    if not weights:
+        X = y_preds
+        y = np.transpose(y_true)
+        reg = LinearRegression(fit_intercept=False).fit(X, y)
+        print('lin reg score: ', reg.score(X, y))
+        weights = reg.coef_
+        print('weights: ', weights)
+    weights = np.array(weights)
+    final_pred = np.transpose(y_preds.dot(weights))
+    return final_pred
+
+
+methods = {'mean': ens_mean,
+           'weight': ens_weight}
+# functions for choosing tokenizer, optimizer and model
+
+
+def choose_model(model_name, text, n_layers, hidden_dim, dropout):
+    model = globals()[model_name](text.vocab.vectors,
+                       lstm_layer=n_layers,
+                       padding_idx=text.vocab.stoi[text.pad_token],
+                       hidden_dim=hidden_dim,
+                       dropout=dropout).cuda()
+    return model
+
+
+def choose_optimizer(params, args):
+    if args.optim == 'Adam':
+        optimizer = optim.Adam(params, lr=args.lr)
+    elif args.optim == 'AdamW':
+        optimizer = optim.Adam(params, lr=args.lr, betas=(0.9, 0.99))
+    return optimizer# list of possible models for ensemble
+
+
+model_dict = {
+    'wnews': ('Jan_10_2019__21:56:52', '-es 3 -e 10 -em wnews  -hd 150 -we 10 --lrstep 10'), # 827
+    'glove': ('Jan_10_2019__22:10:15', '-es 2 -e 9 -hd 150'), # 829
+    'paragram': ('Jan_11_2019__11:10:57', '-hd 150 -es 2 -e 10 -em paragram -t lowerspacy -us 0'), #873
+    'gnews': ('Jan_11_2019__20:21:01', '-em gnews -es 2 -e 10 -hd 150 -us 0.1'), # 889
+    'gnews_num': ('Jan_12_2019__22:13:37', '-em gnews -t gnews_num -es 2 -e 10 -us 0.1 -hd 150'), # 927
+    'wnews_test': ('Jan_10_2019__19:33:05_test', '--mode test -em wnews'),
+    'glove_test': ('Jan_10_2019__19:34:39_test', '--mode test -em glove'),
+    'glove_cv': ('Jan_17_2019__17_59_36', '-hd 150 -k 5 -ne 3'),  # 1077
+    'paragram_cv': ('Jan_15_2019__04_23_16', '-k 5 -hd 150 -e 10 -em paragram -t lowerspacy -us 0.1'), #983 ! try -ne 3
+    'wnews_cv': ('Jan_11_2019__05:09:58', '-es 3 -e 10 -em wnews -m BiLSTMPoolTest -vl -hd 150 -we 10 --lrstep 20 -k 5 -us 0.1'), #855
+    'gnews_cv': ('Jan_18_2019__15_06_29', '-em gnews -es 2 -e 10 -hd 150 -us 0.1 -k 5 -ne 3'),  # 1113
+    'gnews_num_cv': ('Jan_18_2019__16_45_38', '-em gnews -e 10 -hd 150 -us 0.1 -k 5 -ne 3 -t gnews_num'), # 1119
+    'gnews_ph_cv': ('Jan_19_2019__16_05_11', '-em gnews -e 10 -hd 150 -ne 3 -t gnews_ph -k 5 -us 0.1'), #1189
+    'gnews_ph_num_cv': ('Jan_19_2019__18_56_02', '-em gnews -e 10 -hd 150 -ne 3 -t gnews_ph_num -k 5 -us 0.1'),  #1195
+    'gnews_cv_2': ('Jan_20_2019__08_17_29', '-em gnews -e 12 -hd 150 -ne 3 -k 5 -us 0.1 -lr 0.002'),  #1234
+    'wnews_cv_2': ('Jan_21_2019__00_07_54', '-em wnews -e 12 -hd 150 -ne 3 -k 5 -us 0.1 -lr 0.002'), #1288
+    'wnews_cv_3': ('Jan_21_2019__22_08_57', '-em wnews -e 12 -hd 150 -ne 3 -k 5 -us 0.1 -lr 0.0025 -we 10'), #1334 ! try --lrstep 2
+    'linpool4_cv': ('Feb_01_2019__16_06_28', '-k 5 -m LinPool4 -em glove paragram wnews gnews -we 20 -e 10'), #1501
+    'linpool3_cv': ('Feb_03_2019__14_41_27', '-k 5 -m LinPool3 -em glove paragram wnews -e 10 -lr 0.002 -we 20') #1589
+}
 
 
 class Learner:
@@ -1226,7 +1225,7 @@ class Learner:
 
         step = 0
         min_loss = 1e5
-        max_f1 = 0
+        max_f1 = -1
         max_test_f1 = 0
         no_improve_epoch = 0
         no_improve_in_previous_epoch = False
@@ -1680,6 +1679,7 @@ def main(main_args=None):
 
 
 
+
 class Ensemble:
     ens_record_path = 'notes/ensemble.csv'
 
@@ -1757,10 +1757,10 @@ class Ensemble:
         thresh, max_f1 = self.evaluate_ensemble(val_ens_prob, y_true, thresh)
         self.record(max_f1, thresh, method)
         # predict test labels and save submission
-        try:
-            self.predict_test(method, thresh)
-        except:
-            print("can't predict test data")
+        # try:
+        self.predict_test(method, thresh)
+        # except:
+        # print("can't predict test data")
 
     def predict_test(self, method, thresh):
         y_preds = []
@@ -1771,7 +1771,7 @@ class Ensemble:
             if last_ids:
                 if np.array_equal(last_ids, ids):
                     raise Exception('Prediction ids should be the same for ensemble')
-        test_ens_prob = methods[method](y_preds, args)  # target probability after ensembling
+        test_ens_prob = methods[method](y_preds, args=args)  # target probability after ensembling
         test_ens_label = (test_ens_prob > thresh).astype(int)
         submit(ids, test_ens_label, test_ens_prob)
 
@@ -1870,11 +1870,10 @@ def parse_ens_args():
     return args
 
 
-
 def parse_ens_main_args():
     parser = argparse.ArgumentParser(parents=[ens_parser(add_help=False)])
     arg = parser.add_argument
-    arg('--main_args', '-a', nargs='+', default=["-es 3 -e 8 -em wnews -hd 150 -we 10 --lrstep 10 -mv 500000", "-e 5 -hd 150 -mv 1100000", "-e 8 -hd 150 -em paragram -us 0 -mv 850000"], type=str)
+    arg('--main_args', '-a', nargs='+', default=['--mode test -em glove', '--mode test -em wnews', '--mode test -em paragram', '--mode test -em gnews', '--mode test -m LinPool3 -em glove paragram wnews'], type=str)
     args = parser.parse_args()
     return args
 
@@ -1891,3 +1890,4 @@ if __name__ == '__main__':
 
 # '--mode test -em glove', '--mode test -em wnews', '--mode test -em paragram'
 # "-es 3 -e 8 -em wnews -hd 150 -we 10 --lrstep 10 -us 0.1", "-e 5 -hd 150 -us 0.1", "-e 5 -hd 150 -em paragram -us 0"
+# '--mode test -em glove', '--mode test -em wnews', '--mode test -em paragram', '--mode test -em gnews', '--mode test -m LinPool3 -em glove paragram wnews'

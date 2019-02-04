@@ -2,11 +2,11 @@ import numpy as np
 from sklearn.linear_model import LinearRegression
 
 
-def ens_mean(preds, y_true, args):
+def ens_mean(preds, y_true=None, args=None):
     return np.mean(np.array(preds), 0)
 
 
-def ens_weight(y_preds, y_true, args):
+def ens_weight(y_preds, y_true=None, args=None):
     weights = args.weights
     y_preds = np.transpose(np.array(y_preds))
     if not weights:

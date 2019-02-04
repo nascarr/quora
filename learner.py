@@ -40,7 +40,7 @@ class Learner:
 
         step = 0
         min_loss = 1e5
-        max_f1 = 0
+        max_f1 = -1
         max_test_f1 = 0
         no_improve_epoch = 0
         no_improve_in_previous_epoch = False
