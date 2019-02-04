@@ -68,6 +68,28 @@ class Ensemble:
         return cls(val_cv_paths, models, test_cv_paths, single_model_dirs)
 
     def __call__(self, method, thresh, method_params=None):
+        # find best method parameters based on validation data
+        y_preds = []
+        last_ids = None
+        for pp in self.val_pred_paths:
+            ids, y_prob, y_true = load_pred_from_csv(pp)
+            y_preds.append(y_prob)
+            if last_ids is None:
+                last_ids = ids
+            else:
+                if not np.array_equal(last_ids, ids):
+                    raise Exception('Prediction ids should be the same for ensemble')
+
+        val_ens_prob = methods[method](y_preds, y_true, method_params)  # target probability after ensembling
+        os.makedirs('./ensemble', exist_ok=True)
+        try:
+            pred_to_csv(ids, val_ens_prob, y_true, fpath=os.path.join('./ensemble', ' '.join(self.model_names)))
+        except:
+            print('cant save ensemble predictions for validation data')
+        thresh, max_f1 = self.evaluate_ensemble(val_ens_prob, y_true, thresh)
+        self.record(max_f1, thresh, method)
+        # predict test labels and save submission
+        # try:
         self.predict_test(method, thresh, method_params)
         # except:
         # print("can't predict test data")
