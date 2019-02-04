@@ -90,11 +90,11 @@ class Ensemble:
         self.record(max_f1, thresh, method)
         # predict test labels and save submission
         # try:
-        self.predict_test(method, thresh)
+        self.predict_test(method, thresh, method_params)
         # except:
         # print("can't predict test data")
 
-    def predict_test(self, method, thresh):
+    def predict_test(self, method, thresh, method_params):
         y_preds = []
         last_ids = None
         for pp in self.test_pred_paths:
@@ -103,7 +103,7 @@ class Ensemble:
             if last_ids:
                 if np.array_equal(last_ids, ids):
                     raise Exception('Prediction ids should be the same for ensemble')
-        test_ens_prob = methods[method](y_preds, args=args)  # target probability after ensembling
+        test_ens_prob = methods[method](y_preds, args=method_params)  # target probability after ensembling
         test_ens_label = (test_ens_prob > thresh).astype(int)
         submit(ids, test_ens_label, test_ens_prob)
 
