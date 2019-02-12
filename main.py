@@ -86,7 +86,7 @@ def analyze_args(args):
         args.no_cache = True
 
     train_csv = os.path.join(data_dir, 'train.csv')
-    test_csv = os.path.join(data_dir, 'train.csv')
+    test_csv = os.path.join(data_dir, 'test.csv')
     emb_paths = [os.path.join(data_dir, 'embeddings', emb_path) for emb_path in emb_paths]
 
     if args.mode == 'test':
