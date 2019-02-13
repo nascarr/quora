@@ -41,7 +41,7 @@ class Learner:
         step = 0
         min_loss = 1e5
         max_f1 = -1
-        max_test_f1 = 0
+        max_test_f1 = -1
         no_improve_epoch = 0
         no_improve_in_previous_epoch = False
         fine_tuning = False
@@ -98,7 +98,7 @@ class Learner:
 
                         # val evaluation
                         val_loss, val_f1, val_ids, val_prob, val_true = self.evaluate(self.val_dl, tresh)
-                        pred_to_csv(val_ids, val_prob, val_true, f'val_probs_{int(step / eval_every) - 1}.csv')
+                        pred_to_csv(val_ids, val_prob, val_true, f'tmp/val_probs_{int(step / eval_every) - 1}.csv')
                         self.recorder.val_record.append({'step': step, 'loss': val_loss, 'f1': val_f1})
                         info = {'best_ep': e, 'step': step, 'train_loss': train_loss,
                                 'val_loss': val_loss, 'val_f1': val_f1}
@@ -112,13 +112,13 @@ class Learner:
 
                         # test evaluation
                         # if self.args.test:
-                        #     test_loss, test_f1 =  self.evaluate(self.test_dl, tresh)
+                        #    test_loss, test_f1 =  self.evaluate(self.test_dl, tresh)
                         #    test_info = {'test_ep': e, 'test_step': step, 'test_loss': test_loss, 'test_f1': test_f1}
                         #    self.recorder.test_record.append({'step': step, 'loss': test_loss, 'f1': test_f1})
-                        #     print('epoch {:02} - step {:06} - test_loss {:.4f} - test_f1 {:.4f}'.format(*list(test_info.values())))
-                         #   if test_f1 >= max_test_f1:
-                         #       max_test_f1 = test_f1
-                         #       best_test_info = test_info
+                        #    print('epoch {:02} - step {:06} - test_loss {:.4f} - test_f1 {:.4f}'.format(*list(test_info.values())))
+                        #    if test_f1 >= max_test_f1:
+                        #        max_test_f1 = test_f1
+                        #        best_test_info = test_info
 
         tr_time = print_duration(time_start, 'training time: ')
         self.recorder.append_info({'ep_time': tr_time/(e + 1)})
@@ -223,6 +223,7 @@ class Recorder:
         self.test_record = []
         self.norm_record = []
         self.new = True
+        os.makedirs('tmp', exist_ok=True)
 
     @classmethod
     def append_info(cls, dict, message=None):
@@ -254,16 +255,16 @@ class Recorder:
         else:
             header=False
             mode = 'a'
-        dict_to_csv(step_info, 'train_steps.csv', mode, orient='columns', header=header)
+        dict_to_csv(step_info, 'tmp/train_steps.csv', mode, orient='columns', header=header)
         if message:
             print('epoch {:02} - step {:06} - train_loss {:.4f} - val_loss {:.4f} - f1 {:.4f}'.format(
                 *list(step_info.values())))
 
     def record(self, fold):
         # save plots
-        save_plot(self.val_record, 'loss', self.args.n_eval, 'val_loss')
-        save_plot(self.val_record, 'f1', self.args.n_eval, 'val_f1')
-        save_plot(self.norm_record, 'grad_norm', self.args.n_eval, 'grad_norm')
+        save_plot(self.val_record, 'loss', self.args.n_eval, 'tmp/val_loss.png')
+        save_plot(self.val_record, 'f1', self.args.n_eval, 'tmp/val_f1.png')
+        save_plot(self.norm_record, 'grad_norm', self.args.n_eval, 'tmp/grad_norm.png')
         if self.args.test:
             save_plots([self.val_record, self.test_record], ['loss', 'f1'], ['val', 'test'],self.args.n_eval)
 
@@ -290,7 +291,7 @@ class Recorder:
         # copy all records to subdir
         png_files = ['val_loss.png', 'val_f1.png'] if not self.args.test else ['loss.png', 'f1.png']
         csv_files = ['val_probs*.csv', 'train_steps.csv', 'submission.csv', 'test_probs.csv']
-        copy_files([*png_files, 'models/*.info', *csv_files], subdir)
+        copy_files([*png_files, 'models/*.info', *csv_files], 'tmp', subdir)
         return subdir
 
 

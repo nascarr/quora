@@ -6,6 +6,7 @@ from datetime import timedelta
 import matplotlib.pyplot as plt
 import glob
 import shutil
+import os
 
 
 def _submit(test_ids, predictoins, subm_name):
@@ -17,7 +18,7 @@ def _submit(test_ids, predictoins, subm_name):
 
 def submit(test_ids, labels, probs, subm_name='submission.csv'):
     _submit(test_ids, labels, subm_name)
-    pred_to_csv(test_ids, probs, labels, 'test_probs.csv')
+    pred_to_csv(test_ids, probs, labels, 'tmp/test_probs.csv')
     print(f'predictions saved in {subm_name}, test_probs.csv file')
 
 
@@ -96,18 +97,19 @@ def save_plots(records, keys, labels, n_eval):
             x = np.array(range(len(y))) / n_eval
             ax.plot(x, y, label=l)
         plt.legend()
-        fname = k + '.png'
+        fname = os.path.join('tmp', k + '.png')
         fig.savefig(fname)
         plt.close()
 
 
-def copy_files(arg_list, dest_dir):
+def copy_files(arg_list, source_dir, dest_dir):
     for a in arg_list:
+        a = os.path.join(source_dir, a)
         for file in glob.glob(a):
             shutil.copy(file, dest_dir)
 
 
-def pred_to_csv(ids, y_pred, y_true, fpath='val_probs.csv', mode='w'):
+def pred_to_csv(ids, y_pred, y_true, fpath='tmp/val_probs.csv', mode='w'):
     df = pd.DataFrame()
     df['qid'] = ids
     df['prediction'] = y_pred

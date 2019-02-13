@@ -174,12 +174,6 @@ def main(main_args=None):
     args = parse_main_args(main_args)
     train_csv, test_csv, emb_paths, cache = analyze_args(args)
     record_path = job(args, train_csv, test_csv, emb_paths, cache)
-    #path1 = os.path.join(record_path, 'val_probs_3')
-    #path2 = os.path.join(record_path, 'val_probs_4')
-    #val_paths = [path1, path2]
-    #test_paths = []
-    #ens = Ensemble(val_paths, test_paths)
-    #ens('mean', thresh=[0.1, 0.5, 0.01])
     return record_path
 
 

@@ -38,7 +38,7 @@ class MyTabularDataset(TabularDataset):
                 for more details.
         """
 
-        cache_path = os.path.join('.', (os.path.basename(path) + '.td'))
+        cache_path = os.path.join('tmp', (os.path.basename(path) + '.td'))
         try:
             with open(cache_path, 'rb') as f:
                 examples = pickle.load(f)
