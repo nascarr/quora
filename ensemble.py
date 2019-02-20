@@ -1,14 +1,16 @@
 #!/usr/bin/env python
+# Script reads predictions from csv files and ensembles predictions.
 
 import argparse
 import pandas as pd
-from ens_model_list import model_dict
 import os
 import csv
 import numpy as np
+from sklearn.metrics import f1_score
+
+from ens_model_dict import model_dict
 from learner import format_info, choose_thresh
 from ens_methods import methods
-from sklearn.metrics import f1_score
 from utils import dict_to_csv, submit, pred_to_csv
 
 

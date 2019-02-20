@@ -1,3 +1,6 @@
+# Class Data for data preprocessing: tokenization, embedding lookup, train-test split.
+# Function iterate that creates iterators.
+
 import torch
 import time
 import random

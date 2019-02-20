@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# Script trains neural network models according to parsed arguments.
 
 import argparse
 import os
@@ -16,6 +17,7 @@ from utils import submit, check_changes_commited, pred_to_csv
 
 
 def parse_main_args(main_args=None):
+    # parses arguments for main() function
     parser = argparse.ArgumentParser()
     arg = parser.add_argument
 
@@ -60,6 +62,7 @@ def parse_main_args(main_args=None):
     return args
 
 def get_emb_path(emb_name):
+    # returns path for embedding file according to embedding name: glove, paragram, gnews or wnews.
     if emb_name == 'glove':
         emb_path = 'glove.840B.300d/glove.840B.300d.txt'
     elif emb_name == 'paragram':
@@ -70,16 +73,21 @@ def get_emb_path(emb_name):
         emb_path = 'wiki-news-300d-1M/wiki-news-300d-1M.vec'
     return emb_path
 
-def analyze_args(args):
+def preprocess_args(args):
+    # preprocesses args
+
+    # get embedding paths for multiple embeddings in the list args.embedding
     emb_paths = []
     for emb_name in args.embedding:
         emb_path = get_emb_path(emb_name)
         emb_paths.append(emb_path)
+    # if machine is local computer
     if args.machine == 'dt':
         data_dir = cache = './data'
         if args.mode == 'run':
             if not check_changes_commited():
                 sys.exit("Please commit all changes!")
+    # if machine is cloud kernel at kaggle.com
     elif args.machine == 'kaggle':
         data_dir = '../input'
         cache = '.'
@@ -113,7 +121,7 @@ def analyze_args(args):
 
 
 def job(args, train_csv, test_csv, embeddings, cache):
-    """ Main function. Reads data, makes preprocessing, trains model and records results.
+    """ Reads data, makes preprocessing, trains model and records results.
         Gets args as argument and passes values of it's fields to functions."""
 
     data = Data(train_csv, test_csv, cache)
@@ -171,11 +179,13 @@ def job(args, train_csv, test_csv, embeddings, cache):
     return record_path
 
 def main(main_args=None):
+    # Parse and preprocess args. Run job() with preprocessed args.
     args = parse_main_args(main_args)
-    train_csv, test_csv, emb_paths, cache = analyze_args(args)
+    train_csv, test_csv, emb_paths, cache = preprocess_args(args)
     record_path = job(args, train_csv, test_csv, emb_paths, cache)
     return record_path
 
 
 if __name__ == '__main__':
+    # parse args and train model
     main()

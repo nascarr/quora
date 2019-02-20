@@ -1,3 +1,6 @@
+# Classes Learner and Recorder.
+# Learner class has methods to train and evaluate model. Recorder class writes model logs to files.
+
 import numpy as np
 import torch
 import torch.nn as nn
@@ -6,6 +9,7 @@ from sklearn.metrics import f1_score
 import warnings
 import time
 import sys
+
 from utils import f1_metric, print_duration, get_hash, str_date_time, dict_to_csv, save_plot, copy_files, save_plots, \
     pred_to_csv
 

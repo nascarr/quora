@@ -1,5 +1,8 @@
+# Functions for creating small test datasets(first n lines of real datasets).
+
 import os
 import pandas as pd
+
 
 def read_datasets_to_df(datasets):
     dfs = []
@@ -18,13 +21,6 @@ def dfs_to_csv(dfs, csv_names):
 
 
 def small_ds_paths(paths, new_dir, n, string):
-        """
-        :param paths:
-        :param new_dir:
-        :param n:
-        :param string:
-        :return: Paths for small datasets
-        """
         small_paths = []
 
         for p in paths:

@@ -1,5 +1,9 @@
+# Analyze class is designed for analysis of model predictions. It has methods for writing into csv file
+# n random correct predictions, n random incorrect predictions, n most correct predictions
+# (sorted by predicted probability), n most incorrect predictions and n 'most doubt' predictions with predicted
+# probability closest to threshold.
+
 import sys
-from ensemble import load_pred_from_csv
 import pandas as pd
 import os
 
@@ -36,53 +40,53 @@ class Analyze:
         return sample
 
     def random_incorrect(self, n, label):
-        # choose incorrect indexes
-        # random_choice of indexes
-        # save n  text to file 'random_incorrect_label'
+        # choose incorrect predictions
+        # random_choice of predictions
+        # save n text entries to file 'random_incorrect_label'
         incorrect_class = self.incorrect[self.incorrect['target'] == label][self.subset]
         sample = self.random_sample(incorrect_class, n)
         sample.to_csv(self.csv_path('random_incorrect', n, label))
 
     def most_incorrect(self, n, label):
-        # choose incorrect indexes
-        # sort y_prob with indexes
-        # choose top n indexes
-        # save n text to file 'most_incorrect_label'
+        # choose incorrect predictions
+        # sort y_prob by prediction probability
+        # choose top or bottom n indexes
+        # save n text entries to file 'most_incorrect_label'
         incorrect_class = self.incorrect[self.incorrect['target'] == label][self.subset]
         sample = self.most_sample(incorrect_class, n, label)
         sample.to_csv(self.csv_path('most_incorrect', n, label))
 
     def most_doubt_incorrect(self, n, label):
-        # choose incorrect indexes
+        # choose incorrect predictions
         # sort probs, indexes by abs(thresh - prob)
-        # choose top n indexes
-        # save n text to file 'most_doubt_incorrect_label'
+        # choose top or bottom n indexes
+        # save n text entries to file 'most_doubt_incorrect_label'
         correct_class = self.correct[self.correct['target'] == label][self.subset]
         sample = self.doubt_sample(correct_class, n)
         sample.to_csv(self.csv_path('doubt_correct', n, label))
 
     def random_correct(self, n, label):
-        # choose incorrect indexes
-        # random_choice of indexes
-        # save n  text to file 'random_incorrect_label'
+        # choose incorrect predictions
+        # random_choice of predictions
+        # save n text entries to file 'random_incorrect_label'
         correct_class = self.correct[self.correct['target'] == label][self.subset]
         sample = self.random_sample(correct_class, n)
         sample.to_csv(self.csv_path('random_correct', n, label))
 
     def most_correct(self, n, label):
-        # choose incorrect indexes
-        # sort y_prob with indexes
-        # choose top n indexes
-        # save n text to file 'most_incorrect_label'
+        # choose incorrect predictions
+        # sort y_prob by prediction probability
+        # choose top or bottom n indexes
+        # save n text entries to file 'most_incorrect_label'
         correct_class = self.correct[self.correct['target'] == label][self.subset]
         sample = self.most_sample(correct_class, n, label)
         sample.to_csv(self.csv_path('most_correct', n, label))
 
     def most_doubt_correct(self, n, label):
-        # choose incorrect indexes
+        # choose incorrect predictions
         # sort probs, indexes by abs(thresh - prob)
-        # choose top n indexes
-        # save n text to file 'most_doubt_incorrect_label'
+        # choose top or bottom n indexes
+        # save n text entries to file 'most_doubt_incorrect_label'
         correct_class = self.correct[self.correct['target'] == label][self.subset]
         sample = self.doubt_sample(correct_class, n)
         sample.to_csv(self.csv_path('doubt_correct', n, label))
@@ -99,9 +103,12 @@ class Analyze:
             
 
 if __name__ == '__main__':
+    # parse script arguments: prediction path, number of text entries to save, threshold
     pred_path = sys.argv[1]
     n = int(sys.argv[2])
     thresh = float(sys.argv[3])
+
+    # build dataframe train_df
     train_csv = './data/train.csv'
     pred_df = pd.read_csv(pred_path)
     pred_df['prediction'] = pred_df['prediction'].astype(float)
@@ -112,6 +119,8 @@ if __name__ == '__main__':
     train_df = pd.read_csv(train_csv)
     train_df['target'] = train_df['target'].astype(int)
     train_df = train_df.merge(pred_df)
+
+    # run all Analyze class methods
     analyze = Analyze(train_df, thresh)
     analyze.run_all(n)
     # most_correct(n, label=1)

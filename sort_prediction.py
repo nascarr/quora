@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# Sorts prediction at first file according to ids order at second file.
 
 import sys
 import os

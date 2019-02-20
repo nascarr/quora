@@ -1,4 +1,5 @@
 # Overriding torchtext methods
+
 from gensim.models import KeyedVectors
 from torchtext.data.dataset import *
 from torchtext.vocab import *
@@ -10,7 +11,8 @@ import pickle
 
 
 class MyTabularDataset(TabularDataset):
-    """Subclass of torch.data.dataset.TabularDataset for k-fold cross-validation"""
+    """Subclass of torch.data.dataset.TabularDataset for k-fold cross-validation and caching tokenized data."""
+
     def __init__(self, path, format, fields, skip_header=False,
                  csv_reader_params={}, **kwargs):
         """Create a TabularDataset given a path, file format, and field list.
@@ -155,9 +157,11 @@ def k_split_indices(randperm, cut_idxs, k, i, is_test):
 
 
 class MyVectors(Vectors):
-    # def __init__(self, *args, **kwargs):
-    #    self.tokens = 0
-    #    super(MyVectors, self).__init__(*args, *kwargs)
+    """
+    Subclass of torchtext.vocab.Vectors. Can read .bin embedding. If can't
+    find token embedding looks for token.lower() embedding .
+    """
+
     def __init__(self, name, cache=None, to_cache=True,
                  url=None, unk_init=None, max_vectors=None):
         """

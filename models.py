@@ -1,8 +1,11 @@
+# Collection of neural networks models. Includes RNNs and fully connected models.
+
 import torch
 import torch.nn as nn
 
 
 def section_sizes_and_lengths(lengths):
+    # helper function for max_packed() and mean_packed()
     bs = len(lengths)
     flags = lengths[1:] - lengths[:-1]
     cuts = torch.add(torch.nonzero(flags).view(-1), 1)
@@ -13,6 +16,7 @@ def section_sizes_and_lengths(lengths):
 
 
 def max_packed(x, lengths):
+    # maxpool for batches with variable sequence length
     sizes, section_lengths = section_sizes_and_lengths(lengths)
     sizes = sizes.cpu().numpy().tolist()
     tensors = torch.split(x, split_size_or_sections=sizes, dim=1)
@@ -23,6 +27,7 @@ def max_packed(x, lengths):
 
 
 def mean_packed(x, lengths):
+    # averagepool for batches with variable sequence length
     sizes, section_lengths = section_sizes_and_lengths(lengths)
     sizes = sizes.cpu().numpy().tolist()
     tensors = torch.split(x, split_size_or_sections=sizes, dim=1)
@@ -33,6 +38,7 @@ def mean_packed(x, lengths):
 
 
 def out_max_mean(x):
+    # output, maxpool and averagepool for batches with constant sequence length
     out = x[-1]
     max_tensor, _ = torch.max(x, 0)
     mean_tensor = torch.mean(x, 0)
@@ -40,6 +46,7 @@ def out_max_mean(x):
 
 
 def out_max_mean_packed(x, lengths):
+    # output, maxpool and averagepool for batches with variable sequence length
     if lengths[0] == lengths[-1]:
         return out_max_mean(x)
     sizes, section_lengths = section_sizes_and_lengths(lengths)
@@ -53,6 +60,7 @@ def out_max_mean_packed(x, lengths):
 
 
 class BiLSTM(nn.Module):
+    # embedding -> BiLSTM layers -> fc layer -> label
     def __init__(self, pretrained_lm, padding_idx, static=True, hidden_dim=100, lstm_layer=2, dropout=0.2):
         super(BiLSTM, self).__init__()
         self.hidden_dim = hidden_dim
@@ -78,6 +86,7 @@ class BiLSTM(nn.Module):
 
 
 class BiGRU(nn.Module):
+    # embedding -> BiGRU layers -> fc layer -> label
     def __init__(self, pretrained_lm, padding_idx, static=True, hidden_dim=100, lstm_layer=2, dropout=0.2):
         super(BiGRU, self).__init__()
         self.hidden_dim = hidden_dim
@@ -103,6 +112,7 @@ class BiGRU(nn.Module):
 
 
 class BiLSTMPoolOld(nn.Module):
+    # embedding -> BiLSTM layers -> concat output, maxpool, averagepool -> fc layer -> label
     # constant length for all sequences in batch
     def __init__(self, pretrained_lm, padding_idx, static=True, hidden_dim=100, lstm_layer=2, dropout=0.2):
         super(BiLSTMPoolOld, self).__init__()
@@ -134,7 +144,8 @@ class BiLSTMPoolOld(nn.Module):
 
 
 class BiLSTMPool(nn.Module):
-    # varibale length for sequences in batch,  optimized for performance
+    # embedding -> BiLSTM layers -> concat output, maxpool, averagepool -> fc layer -> label
+    # varibale length for sequences in batch
     def __init__(self, pretrained_lm, padding_idx, static=True, hidden_dim=100, lstm_layer=2, dropout=0.2):
         super(BiLSTMPool, self).__init__()
         self.hidden_dim = hidden_dim
@@ -168,6 +179,7 @@ class BiLSTMPool(nn.Module):
 
 
 class BiLSTM_2FC(nn.Module):
+    # embedding -> BiLSTM layers -> 2 fc layer -> label
     def __init__(self, pretrained_lm, padding_idx, static=True, hidden_dim=100, lstm_layer=2, dropout=0.2):
         super(BiLSTM_2FC, self).__init__()
         self.hidden_dim = hidden_dim
@@ -194,6 +206,8 @@ class BiLSTM_2FC(nn.Module):
         return y
 
 class BiGRUPool(nn.Module):
+    # embedding -> BiGRU layers -> concat output, maxpool, averagepool -> fc layer -> label
+    # constant length for sequences in batch
     def __init__(self, pretrained_lm, padding_idx, static=True, hidden_dim=100, lstm_layer=2, dropout=0.2):
         super(BiGRUPool, self).__init__()
         self.hidden_dim = hidden_dim
@@ -224,6 +238,8 @@ class BiGRUPool(nn.Module):
 
 
 class BiGRUPool_2FC(nn.Module):
+    # embedding -> BiGRU layers -> concat output, maxpool, averagepool -> 2 fc layer -> label
+    # constant length for sequences in batch
     def __init__(self, pretrained_lm, padding_idx, static=True, hidden_dim=100, lstm_layer=2, dropout=0.2):
         super(BiGRUPool_2FC, self).__init__()
         self.hidden_dim = hidden_dim
@@ -255,6 +271,8 @@ class BiGRUPool_2FC(nn.Module):
         return y
 
 class BiLSTMPool_2FC(nn.Module):
+    # embedding -> BiLSTM layers -> concat output, maxpool, averagepool -> 2 fc layer -> label
+    # constant length for sequences in batch
     def __init__(self, pretrained_lm, padding_idx, static=True, hidden_dim=100, lstm_layer=2, dropout=0.2):
         super(BiLSTMPool_2FC, self).__init__()
         self.hidden_dim = hidden_dim
@@ -342,7 +360,7 @@ class LinPool4(nn.Module):
 
 
 class LinPool3(nn.Module):
-    # 4 embeddings, lin layer for each embedding -> concat all ouptus -> max, average pool -> lin layer -> label
+    # 3 embeddings, lin layer for each embedding -> concat all ouptus -> max, average pool -> lin layer -> label
     def __init__(self, pretrained_lm, padding_idx, static=True, hidden_dim=100, lstm_layer=2, dropout=0.2):
         super(LinPool3, self).__init__()
         self.hidden_dim = hidden_dim
