@@ -8,7 +8,7 @@ from main import *
 def parse_ens_main_args():
     parser = argparse.ArgumentParser(parents=[ens_parser(add_help=False)])
     arg = parser.add_argument
-    arg('--main_args', '-a', nargs='+', default=['--mode test -em glove', '--mode test -em wnews', '--mode test -em paragram', '--mode test -em gnews', '--mode test -m LinPool3 -em glove paragram wnews'], type=str)
+    arg('--main_args', '-a', nargs='+', default=["-e 6 --seed 1", "-em paragram -us 0.1 -e 4 --seed 42", "-em wnews -us 0.1 -lr 0.0025 -we 10 -e 7 --seed 13", "-em gnews -us 0.1 -lr 0.002 -e 5 --seed 77", "-m LinPool3 -em glove paragram wnews -lr 0.002 -we 20 -e 10 -hd 100 --seed 3 -mv 1500000"], type=str)
     args = parser.parse_args()
     return args
 
