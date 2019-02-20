@@ -1,4 +1,4 @@
-# list of possible models for ensemble
+# dictionary of possible models for ensemble
 
 
 model_dict = {
