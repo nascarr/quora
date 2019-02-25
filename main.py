@@ -21,39 +21,40 @@ def parse_main_args(main_args=None):
     parser = argparse.ArgumentParser()
     arg = parser.add_argument
 
-    arg('--machine', default='dt', choices=['dt', 'kaggle'])
-    arg('--mode', default='run', choices=['test', 'run'])
+    arg('--machine', default='dt', choices=['dt', 'kaggle'], help='Local machine: dt. Kaggle kernel: kaggle.')
+    arg('--mode', default='run', choices=['test', 'run'], help='Main mode: run. Test mode: test.')
 
     # data preprocessing params
-    arg('--kfold', '-k', type=int)
-    arg('--split_ratio', '-sr', nargs='+', default=[0.8], type=float)
-    arg('--test', action='store_true') # if present split data in train-val-test else split train-val
-    arg('--seed', default=2018, type=int)
-    arg('--tokenizer', '-t', default='spacy')
-    arg('--embedding', '-em', default=['glove'], nargs='+', choices=['glove', 'gnews', 'paragram', 'wnews'])
-    arg('--max_vectors', '-mv', default=5000000, type=int)
-    arg('--no_cache', action='store_true')
-    arg('--var_length', '-vl', action = 'store_false') # variable sequence length in batches
-    arg('--unk_std', '-us', default = 0.001, type=float)
-    arg('--stratified', '-s', action='store_true')
+    arg('--kfold', '-k', type=int, help='K-fold cross-validation.')
+    arg('--split_ratio', '-sr', nargs='+', default=[0.8], type=float, help='Split ratio.')
+    arg('--test', action='store_true', help='If present split data in train-val-test else split in train-val.')
+    arg('--seed', default=2018, type=int, help='Seed for data split.')
+    arg('--tokenizer', '-t', default='spacy', help='Tokenizer. See tokenizers.py.')
+    arg('--embedding', '-em', default=['glove'], nargs='+', choices=['glove', 'gnews', 'paragram', 'wnews'], help='Embedding.')
+    arg('--max_vectors', '-mv', default=5000000, type=int, help='Load no more than max_vectors number of embedding vectors.')
+    arg('--no_cache', action='store_true', help='Don\'t cache embeddings.')
+    arg('--var_length', '-vl', action = 'store_false', help='Variable sequence length in batches.') 
+    arg('--unk_std', '-us', default = 0.001, type=float, help='Standart deviation for initialization\
+                                                               of tokens without embedding vector.')
+    arg('--stratified', '-s', action='store_true', help='Stratified split.')
 
     # training params
-    arg('--optim', '-o', default='Adam', choices=['Adam', 'AdamW'])
-    arg('--epoch', '-e', default=7, type=int)
-    arg('--lr', '-lr', default=1e-3, type=float)
-    arg('--lrstep', default=[3], nargs='+', type=int) # steps when lr multiplied by 0.1
-    arg('--batch_size', '-bs', default=512, type=int)
-    arg('--n_eval', '-ne', default=1, type=int, help='Number of validation set evaluations during 1 epoch')
-    arg('--warmup_epoch', '-we', default=2, type=int, help='Number of epochs without fine tuning')
-    arg('--early_stop', '-es', default=2, type=int, help='Stop training if no improvement during this number of epochs')
-    arg('--f1_tresh', '-ft', default=0.335, type=float)
-    arg('--clip', type=float, default=1, help='gradient clipping')
+    arg('--optim', '-o', default='Adam', choices=['Adam', 'AdamW'], help='Optimizer. See choose.py')
+    arg('--epoch', '-e', default=7, type=int, help='Number of epochs.')
+    arg('--lr', '-lr', default=1e-3, type=float, help='Initial learning rate.')
+    arg('--lrstep', default=[3], nargs='+', type=int, help='Steps when lr multiplied by 0.1.') # 
+    arg('--batch_size', '-bs', default=512, type=int, help='Batch size.')
+    arg('--n_eval', '-ne', default=1, type=int, help='Number of validation set evaluations during 1 epoch.')
+    arg('--warmup_epoch', '-we', default=2, type=int, help='Number of epochs without embedding tuning.')
+    arg('--early_stop', '-es', default=2, type=int, help='Stop training if no improvement during this number of epochs.')
+    arg('--f1_tresh', '-ft', default=0.335, type=float, help='Threshold for calculation of F1-score.')
+    arg('--clip', type=float, default=1, help='Gradient clipping.')
 
     # model params
-    arg('--model', '-m', default='BiLSTMPool')
-    arg('--n_layers', '-n', default=2, type=int, help='Number of layers in model')
-    arg('--hidden_dim', '-hd', type=int, default=100)
-    arg('--dropout', '-d', type=float, default=0.2)
+    arg('--model', '-m', default='BiLSTMPool', help='Model name. See models.py.')
+    arg('--n_layers', '-n', default=2, type=int, help='Number of RNN layers in model.')
+    arg('--hidden_dim', '-hd', type=int, default=100, help='Hidden dimension for RNN.')
+    arg('--dropout', '-d', type=float, default=0.2, help='Dropout probability.')
 
     if main_args:
         args = parser.parse_args(main_args)
@@ -130,7 +131,7 @@ def job(args, train_csv, test_csv, embeddings, cache):
     to_cache = not args.no_cache
     data.read_embedding(embeddings, args.unk_std, args.max_vectors, to_cache)
     data.preprocess(args.tokenizer, args.var_length)
-    data.embedding_lookup()
+    data.embedding_lookup() if present split data in train-val-test else split train-val
 
     # split train dataset
     data_iter = data.split(args.kfold, args.split_ratio, args.stratified, args.test, args.seed)
