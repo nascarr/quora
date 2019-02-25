@@ -2,7 +2,8 @@
 #### Data science competition at Kaggle.com
 #### https://www.kaggle.com/c/quora-insincere-questions-classification
 #### Top 2% solution
-Solution for Quora Insincere Questions Classification, data science competition at Kaggle.com.
+## Introduction
+This repository contains my solution for Quora Insincere Questions Classification, data science competition at Kaggle.com.
 Goal of the competition was to built algorithm that identifies toxic questions asked at quora.com. 
 Algorithms were evaluated by F1 score.
 
@@ -29,6 +30,29 @@ My final solution is an ensemble of 5 neural network models: 4 Recurrent Neural 
 Each RNN model used different pretrained embeddings: glove.840B.300d, GoogleNews-vectors-negative300,
 paragram_300_sl999, wiki-news-300d-1M.
 
-Executing script ens_main.py with default arguments runs final algorithm from beginning to the end.
+More details are coming soon.
+
+## Prerequisite
+See requirements.txt.
+
+## Train model with different hyperparameters
+``` chmod +x main.py```
+
+Train RNN model with default hyperparameters.
+
+```./main.py```
+
+Test model with default hyperparameters. In test mode model is trained and evaluated on small datasets (1000 entries) using pretrained embedding for most common 10000 words.
+
+```./main.py --mode test```
+
+Train model with specific hyperparameters. Example.
+
+```./main.py -hd 150 -em paragram -us 0.1 --seed 4 -s -e 10 -es 3```
+
+Train model with various hyperparameters. Arguments description.
+
+## Run final solution: ensemble of 5 models
+```./ens_main.py```
 
 
