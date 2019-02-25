@@ -131,7 +131,7 @@ def job(args, train_csv, test_csv, embeddings, cache):
     to_cache = not args.no_cache
     data.read_embedding(embeddings, args.unk_std, args.max_vectors, to_cache)
     data.preprocess(args.tokenizer, args.var_length)
-    data.embedding_lookup() if present split data in train-val-test else split train-val
+    data.embedding_lookup()
 
     # split train dataset
     data_iter = data.split(args.kfold, args.split_ratio, args.stratified, args.test, args.seed)
