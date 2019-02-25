@@ -44,7 +44,9 @@ See requirements.txt.
 
 ```./main.py```
 
-#### Test model with default hyperparameters. In test mode model is trained and evaluated on small datasets (1000 entries) using pretrained embedding for most common 10000 words.
+#### Test model with default hyperparameters. 
+
+In test mode model is trained and evaluated on small datasets (1000 entries) using pretrained embedding for most common 10000 words.
 
 ```./main.py --mode test```
 
