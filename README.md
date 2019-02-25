@@ -36,23 +36,23 @@ More details are coming soon.
 See requirements.txt.
 
 ## Train model with different hyperparameters
-### Make script executable.
+#### Make script executable.
 
 ``` chmod +x main.py```
 
-### Train RNN model with default hyperparameters.
+#### Train RNN model with default hyperparameters.
 
 ```./main.py```
 
-### Test model with default hyperparameters. In test mode model is trained and evaluated on small datasets (1000 entries) using pretrained embedding for most common 10000 words.
+#### Test model with default hyperparameters. In test mode model is trained and evaluated on small datasets (1000 entries) using pretrained embedding for most common 10000 words.
 
 ```./main.py --mode test```
 
-### Train model with specific hyperparameters. Example.
+#### Train model with specific hyperparameters. Example.
 
 ```./main.py -hd 150 -em paragram -us 0.1 --seed 4 -s -e 10 -es 3```
 
-### Train model with various hyperparameters. 
+#### Train model with various hyperparameters. 
 
 See ```./main.py --help```
 
