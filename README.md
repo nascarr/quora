@@ -49,7 +49,7 @@ Each RNN model used different pretrained embeddings: glove.840B.300d, GoogleNews
 paragram_300_sl999, wiki-news-300d-1M.
 
 Other important parts of the solution:
-- code for automatic logging of experiments
+- code for automatic logging of experiments into .csv file
 - class for model errors analysis (most_correct, most_incorrect, most_doubt, random_doubt, random_correct, random_incorrect)
 - code for for ensembling (mean, weighted ensemble)
 - 5 fold stratified cross validation
@@ -58,6 +58,7 @@ Other important parts of the solution:
 - trainable initialization of hidden state
 - early stopping
 - freeze embeddings first two epochs, finetune embeddings during later epochs
+- hyperparameter optimization (> 1000 experiments)
 
 ## Prerequisite
 See requirements.txt.
