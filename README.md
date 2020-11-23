@@ -35,6 +35,8 @@ Some examples:
 | How can I top CBSE in 6 months? | Why did the Pope say that "Muslims are a curse to this world"? |
 | What does great wit mean? | Should I really feel that it's okay not to love or respect women? |
 
+Data is imbalanced (94% sincere questions, 6% insincere questions)
+![alt text](https://github.com/nascarr/quora/blob/master/class_ratio.jpg?raw=true)
 
 ## Solution description
 My final solution is an ensemble of 5 neural network models: 4 Recurrent Neural Network models and
