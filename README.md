@@ -1,11 +1,12 @@
 # Quora Insincere Questions Classification
 #### Data science competition at Kaggle.com
 #### https://www.kaggle.com/c/quora-insincere-questions-classification
-#### Top 2% solution
+#### Top 2% solution, Silver Medal
 ## Introduction
 This repository contains my solution for Quora Insincere Questions Classification, data science competition at Kaggle.com.
 Goal of the competition was to built algorithm that identifies toxic questions asked at quora.com. 
 Algorithms were evaluated by F1 score.
+My solution scored F1 = 0.704.
 
 ## Competition description
 In this competition you will be predicting whether a question asked on Quora is sincere or not.
@@ -36,6 +37,7 @@ Some examples:
 | What does great wit mean? | Should I really feel that it's okay not to love or respect women? |
 
 Data is imbalanced (94% sincere questions, 6% insincere questions)
+
 ![alt text](https://github.com/nascarr/quora/blob/master/class_ratio.png?raw=true)
 
 ## Solution description
