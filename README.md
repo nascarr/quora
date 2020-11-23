@@ -23,6 +23,16 @@ An insincere question is defined as a question intended to make a statement rath
 * Isn't grounded in reality
     * Based on false information, or contains absurd assumptions
 
+## Data
+Models were trained on 1.3 million of questions and binary labels (Sincere/Insincere).
+
+Some examples:
+| Sincere | Insincere |
+| --- | --- |
+| `git status` | List all *new or modified* files |
+| `git diff` | Show file differences that **haven't been** staged |
+
+
 ## Solution description
 My final solution is an ensemble of 5 neural network models: 4 Recurrent Neural Network models and
 1 Neural Network model with fully connected layers.
