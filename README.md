@@ -4,8 +4,8 @@
 #### Top 2% solution, Silver Medal
 ## Introduction
 This repository contains my solution for Quora Insincere Questions Classification, data science competition at Kaggle.com.
-Goal of the competition was to built algorithm that identifies toxic questions asked at quora.com. 
-Algorithms were evaluated by F1 score.
+Goal of the competition was to built algorithm that identifies toxic/insincere questions asked at quora.com. 
+Algorithms were evaluated by F1 score for insincere questions.
 
 My solution scored F1 = 0.704.
 
