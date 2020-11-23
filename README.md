@@ -48,10 +48,20 @@ My final solution is an ensemble of 5 neural network models: 4 Recurrent Neural 
 Each RNN model used different pretrained embeddings: glove.840B.300d, GoogleNews-vectors-negative300,
 paragram_300_sl999, wiki-news-300d-1M.
 
-More details are coming soon.
+Other important parts of the solution:
+- code for automatic logging of experiments
+- class for model errors analysis (most_correct, most_incorrect, most_doubt, random_doubt, random_correct, random_incorrect)
+- code for for ensembling (mean, weighted ensemble)
+- 5 fold stratified cross validation
+- reverse engineering of tokenizer for GoogleNews embeddings
+- variable sequence length in batches
+- trainable initialization of hidden state
+- early stopping
+- freeze embeddings first two epochs, finetune embeddings during later epochs
 
 ## Prerequisite
 See requirements.txt.
+GPU is required for training.
 
 ## Train model with different hyperparameters
 #### Make script executable.
