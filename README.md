@@ -58,6 +58,8 @@ Other important parts of the solution:
 - trainable initialization of hidden state
 - early stopping
 - freeze embeddings first two epochs, finetune embeddings during later epochs
+- learning rate decay
+- experiments with model architecture (GRU/LSTM, average/max pooling, 0-2 FC layers on top of RNN output)
 - hyperparameter optimization (> 1000 experiments)
 
 ## Prerequisite
