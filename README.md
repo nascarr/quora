@@ -51,7 +51,7 @@ paragram_300_sl999, wiki-news-300d-1M.
 Other important parts of the solution:
 - code for automatic logging of experiments into .csv file
 - class for model errors analysis (most_correct, most_incorrect, most_doubt, random_doubt, random_correct, random_incorrect)
-- code for for ensembling (mean, weighted ensemble)
+- code for ensembling (mean, weighted ensemble)
 - 5 fold stratified cross validation
 - reverse engineering of tokenizer for GoogleNews embeddings
 - variable sequence length in batches
