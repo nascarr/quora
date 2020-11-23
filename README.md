@@ -36,7 +36,7 @@ Some examples:
 | What does great wit mean? | Should I really feel that it's okay not to love or respect women? |
 
 Data is imbalanced (94% sincere questions, 6% insincere questions)
-![alt text](https://github.com/nascarr/quora/blob/master/class_ratio.jpg?raw=true)
+![alt text](https://github.com/nascarr/quora/blob/master/class_ratio.png?raw=true)
 
 ## Solution description
 My final solution is an ensemble of 5 neural network models: 4 Recurrent Neural Network models and
