@@ -29,8 +29,11 @@ Models were trained on 1.3 million of questions and binary labels (Sincere/Insin
 Some examples:
 | Sincere | Insincere |
 | --- | --- |
-| `git status` | List all *new or modified* files |
-| `git diff` | Show file differences that **haven't been** staged |
+| What can you say about feminism? | Has the United States become the largest dictatorship in the world? |
+| How were the Calgary Flames founded? | Which babies are more sweeter to their parents? Dark skin babies or light skin babies? |
+| Should I leave my friends and find new ones? | Was AIDS a punishment from God for gay people? |
+| How can I top CBSE in 6 months? | Why did the Pope say that "Muslims are a curse to this world"? |
+| What does great wit mean? | Should I really feel that it's okay not to love or respect women? |
 
 
 ## Solution description
